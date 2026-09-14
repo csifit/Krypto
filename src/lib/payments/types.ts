@@ -76,4 +76,10 @@ export interface LocalPaymentRecord {
   status: "settled";
   settledAt: string;
   beneficiaryName?: string;
+  verification?: {
+    onchain: true;
+    chainId: number;
+    blockNumber: string;
+    verifiedAt: string;
+  };
 }

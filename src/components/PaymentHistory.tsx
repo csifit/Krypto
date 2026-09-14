@@ -74,6 +74,7 @@ export default function PaymentHistory({ refreshKey }: { refreshKey: number }) {
                   <summary>Technical details</summary>
                   <div className="historyTechnicalBody">
                     <span>Network: Celo Sepolia</span>
+                    {record.verification ? <span>Settlement: Verified on-chain</span> : null}
                     <span>Transaction: {shortAddress(record.txHash)}</span>
                     <a
                       className="inlineLink inlineLinkNoMargin"

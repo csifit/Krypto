@@ -2,44 +2,47 @@
 
 **Krypto121 is a smart payment-routing wallet. Create a wallet or bring the wallets you already use. Manage them from one place.**
 
-## v0.15 — Bitcoin watch-only
+## v0.16 — Mainnet-readiness foundations
 
-My wallets can now monitor Bitcoin addresses as well as the existing stablecoin/EVM wallets.
+This milestone does **not** enable real-money transfers.
 
-Choose:
+It strengthens the payment record boundary so a browser can no longer simply claim that a payment settled.
 
-```text
-My wallets
-→ Add watch-only
-→ Wallet type: Bitcoin wallet
-→ Bitcoin address
-```
+For the current direct test route, the server verifies the actual blockchain transaction before storing the durable payment record.
 
-The wallet row then shows its BTC balance and expands to full read-only details.
+Checks include:
 
-Bitcoin support in v0.15 is deliberately limited to monitoring:
+- source wallet belongs to the authenticated Privy user;
+- transaction succeeded;
+- expected token contract;
+- expected sender;
+- expected recipient;
+- exact token amount;
+- matching intent / quote / route / asset.
 
-- no Bitcoin private keys;
-- no seed phrases;
-- no Bitcoin signing;
-- no Bitcoin sending;
-- no Bitcoin payment routing yet.
-
-Balances are read from public Bitcoin blockchain data server-side.
+The server records the blockchain-derived settlement time, block number, chain ID and verification time.
 
 ## Upgrade
 
-Apply:
+Apply migration:
 
 ```text
-supabase/migrations/202609140004_bitcoin_watch_wallets.sql
+supabase/migrations/202609140005_payment_settlement_verification.sql
 ```
 
-Then run:
+Then:
 
 ```bash
 npm install
 npm run build
 ```
 
+Keep:
+
+```text
+NEXT_PUBLIC_KRYPTO_NETWORK=testnet
+```
+
 No new environment variables are required.
+
+See `docs/upgrades/UPGRADE-v0.16.md`.

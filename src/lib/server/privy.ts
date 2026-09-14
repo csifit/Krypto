@@ -1,4 +1,5 @@
 import { PrivyClient } from "@privy-io/node";
+import { isAddress } from "viem";
 
 let privyClient: PrivyClient | null = null;
 
@@ -13,6 +14,23 @@ function getPrivyClient() {
 
   privyClient = new PrivyClient({ appId, appSecret });
   return privyClient;
+}
+
+type PrivyUserLike = {
+  linked_accounts?: Array<{ address?: string }>;
+  linkedAccounts?: Array<{ address?: string }>;
+};
+
+export async function getPrivyLinkedEvmAddresses(userId: string) {
+  const user = (await getPrivyClient().users()._get(userId)) as unknown as PrivyUserLike;
+  const accounts = user.linked_accounts ?? user.linkedAccounts ?? [];
+
+  return new Set(
+    accounts
+      .map((account) => account.address)
+      .filter((address): address is string => Boolean(address && isAddress(address)))
+      .map((address) => address.toLowerCase()),
+  );
 }
 
 export async function requirePrivyUser(request: Request) {

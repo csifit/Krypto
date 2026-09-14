@@ -261,19 +261,22 @@ Move My wallets to a full page with compact accordion rows and direct payment-so
 Let users give owned wallets simple private names that follow them into Send and Receive. Complete.
 
 ### M14 — Bitcoin watch-only
-Park Bitcoin addresses and monitor BTC balances without custody or signing. **Current.**
+Park Bitcoin addresses and monitor BTC balances without custody or signing. Complete.
 
-### M15 — Router expansion
-Add an alternative route only when there is a concrete route/provider to compare with direct settlement.
+### M15 — Mainnet-readiness foundations
+Verify wallet ownership and blockchain settlement server-side before persisting a payment. **Current.**
 
-### M16 — Gas UX
+### M16 — Router expansion
+Add Relay only when there is a real supported asset/network route to execute.
+
+### M17 — Gas UX
 Hide native-token complexity using the safest supported mechanism.
 
-### M17 — External settlement rails
+### M18 — External settlement rails
 Off-ramp / FX / CBDC integrations through regulated providers.
 
-### M18 — Mainnet preparation
-Security review, monitoring, production RPC, compliance boundaries, and mainnet guardrails.
+### M19 — Controlled mainnet launch
+Production RPC, monitoring, limits, compliance boundaries, incident controls, and explicit mainnet activation.
 
 ## Principle
 
@@ -483,3 +486,45 @@ The balance is read from public Bitcoin blockchain data through a server-side AP
 - cannot sign or broadcast a transaction.
 
 This creates the multi-network wallet-directory foundation without introducing Bitcoin transaction logic prematurely.
+
+
+## v0.16 — Mainnet-readiness foundations
+
+Krypto121 no longer accepts a browser-reported `settled` payment as sufficient proof for the durable payment record.
+
+For the current direct Celo Sepolia route:
+
+```text
+wallet signs
+   ↓
+blockchain settles
+   ↓
+browser sends transaction hash + payment record
+   ↓
+Krypto121 server verifies
+   +-- authenticated Privy user owns/linked the source wallet
+   +-- transaction succeeded
+   +-- transaction came from the expected source wallet
+   +-- transaction called the expected token contract
+   +-- ERC-20 transfer recipient matches
+   +-- ERC-20 transfer amount matches
+   +-- intent / quote / route / asset match
+   ↓
+payment record stored
+```
+
+The server derives `settled_at` from the blockchain block timestamp rather than trusting the browser-provided timestamp.
+
+New durable verification metadata:
+
+```text
+verified_at
+settlement_block_number
+chain_id
+```
+
+A second record cannot claim the same transaction on the same network because `network + tx_hash` is unique.
+
+This verifier is intentionally route-aware. Today it supports only the existing `direct-celo` test route. Future Relay settlement must receive its own verifier rather than bypassing this boundary.
+
+Mainnet execution remains disabled. v0.16 improves the trust boundary; it does not turn on real-money transfers.

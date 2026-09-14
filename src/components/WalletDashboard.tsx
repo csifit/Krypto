@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useConnectWallet, useLinkAccount, usePrivy, useWallets } from "@privy-io/react-auth";
+import { useRouter } from "next/navigation";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { isAddress } from "viem";
 import BeneficiariesPanel from "@/components/BeneficiariesPanel";
 import DashboardSidebar, { type SecondarySection } from "@/components/DashboardSidebar";
@@ -10,21 +11,17 @@ import ReceivePanel, { type ReceiveWalletOption } from "@/components/ReceivePane
 import SendPanel from "@/components/SendPanel";
 import TestFundsPanel from "@/components/TestFundsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
-import WalletsPanel from "@/components/WalletsPanel";
 import { useWalletPortfolio } from "@/hooks/useWalletPortfolio";
 import { celoSepolia } from "@/lib/celo";
 import {
   createBeneficiary,
-  createWatchWallet,
   deleteBeneficiary,
-  deleteWatchWallet,
   listBeneficiaries,
-  listWatchWallets,
   syncProfile,
 } from "@/lib/backend/client";
 import type { Beneficiary } from "@/lib/payments/types";
 import type { PaymentRequest } from "@/lib/payments/paymentRequest";
-import type { LinkedWalletView, WatchWallet } from "@/lib/wallet/directory";
+import type { LinkedWalletView } from "@/lib/wallet/directory";
 import { createPrivyWalletProvider } from "@/lib/wallet/privy";
 import type { PaymentSourceWallet } from "@/lib/wallet/types";
 
@@ -61,6 +58,7 @@ export default function WalletDashboard({
 }: {
   initialPaymentRequest?: PaymentRequest;
 } = {}) {
+  const router = useRouter();
   const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
   const [showReceive, setShowReceive] = useState(false);
@@ -68,24 +66,36 @@ export default function WalletDashboard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SecondarySection>(null);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
-  const [watchWallets, setWatchWallets] = useState<WatchWallet[]>([]);
   const [beneficiariesLoading, setBeneficiariesLoading] = useState(false);
-  const [walletsLoading, setWalletsLoading] = useState(false);
-  const [walletLinkStatus, setWalletLinkStatus] = useState<string | null>(null);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [initialSourceAddress, setInitialSourceAddress] = useState<`0x${string}` | undefined>();
 
-  const { linkWallet } = useLinkAccount({
-    onSuccess: () => {
-      setWalletLinkStatus("Wallet linked to your Krypto121 account.");
-    },
-    onError: (error) => {
-      setWalletLinkStatus(error || "Could not link wallet");
-    },
-  });
 
-  const { connectWallet } = useConnectWallet();
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedSource = params.get("payFrom");
+    const requestedSection = params.get("section");
+
+    if (requestedSource && isAddress(requestedSource)) {
+      setInitialSourceAddress(requestedSource as `0x${string}`);
+      setShowSend(true);
+      setShowReceive(false);
+    }
+
+    if (requestedSection === "beneficiaries" || requestedSection === "history" || requestedSection === "developer") {
+      setActiveSection(requestedSection);
+    }
+  }, []);
+
+  function handleSidebar(section: SecondarySection) {
+    if (section === "wallets") {
+      router.push("/wallets");
+      return;
+    }
+    setActiveSection(section);
+  }
 
   const embeddedWallet = wallets.find(
     (wallet) => wallet.walletClientType === "privy",
@@ -167,15 +177,7 @@ export default function WalletDashboard({
     );
   }, [embeddedWallet?.address, linkedWallets]);
 
-  const trackedWalletAddresses = useMemo<`0x${string}`[]>(() => {
-    const addresses = [...ownedWalletAddresses, ...watchWallets.map((wallet) => wallet.address)];
-    return addresses.filter(
-      (address, index, all) =>
-        all.findIndex((candidate) => candidate.toLowerCase() === address.toLowerCase()) === index,
-    );
-  }, [ownedWalletAddresses, watchWallets]);
-
-  const portfolio = useWalletPortfolio(trackedWalletAddresses);
+  const portfolio = useWalletPortfolio(ownedWalletAddresses);
 
   const ownedUsdtTotal = useMemo(() => {
     return ownedWalletAddresses.reduce((total, address) => {
@@ -218,7 +220,6 @@ export default function WalletDashboard({
 
     if (!walletAddress) {
       setBeneficiaries([]);
-      setWatchWallets([]);
       return;
     }
 
@@ -226,20 +227,15 @@ export default function WalletDashboard({
 
     async function loadBackend(address: `0x${string}`) {
       setBeneficiariesLoading(true);
-      setWalletsLoading(true);
       setBackendError(null);
 
       try {
         await syncProfile(getAccessToken, address);
 
-        const [nextBeneficiaries, nextWatchWallets] = await Promise.all([
-          listBeneficiaries(getAccessToken),
-          listWatchWallets(getAccessToken),
-        ]);
+        const nextBeneficiaries = await listBeneficiaries(getAccessToken);
 
         if (!cancelled) {
           setBeneficiaries(nextBeneficiaries);
-          setWatchWallets(nextWatchWallets);
         }
       } catch (error) {
         if (!cancelled) {
@@ -252,7 +248,6 @@ export default function WalletDashboard({
       } finally {
         if (!cancelled) {
           setBeneficiariesLoading(false);
-          setWalletsLoading(false);
         }
       }
     }
@@ -279,25 +274,6 @@ export default function WalletDashboard({
     setBeneficiaries((current) => current.filter((item) => item.id !== id));
   }
 
-  async function addWatchWallet(label: string, address: `0x${string}`) {
-    const created = await createWatchWallet(getAccessToken, { label, address });
-    setWatchWallets((current) => [...current, created]);
-  }
-
-  async function removeWatchWallet(id: string) {
-    await deleteWatchWallet(getAccessToken, id);
-    setWatchWallets((current) => current.filter((item) => item.id !== id));
-  }
-
-  function linkExternalWallet() {
-    setWalletLinkStatus("Connect and verify the wallet you want to add.");
-    linkWallet();
-  }
-
-  function connectExternalWallet() {
-    setWalletLinkStatus("Connect a linked wallet to use it for payments in this session.");
-    connectWallet();
-  }
 
   async function refreshAll() {
     await portfolio.refresh();
@@ -372,7 +348,7 @@ export default function WalletDashboard({
         activeSection={activeSection}
         email={user?.email?.address}
         onClose={() => setMenuOpen(false)}
-        onSelect={setActiveSection}
+        onSelect={handleSidebar}
         onLogout={logout}
       />
 
@@ -462,6 +438,7 @@ export default function WalletDashboard({
                 sourceWallets={paymentSources}
                 beneficiaries={beneficiaries}
                 initialRequest={initialPaymentRequest}
+                initialSourceAddress={initialSourceAddress}
                 onSent={refreshAll}
               />
             ) : null}
@@ -479,22 +456,6 @@ export default function WalletDashboard({
                 </button>
               </div>
 
-              {activeSection === "wallets" ? (
-                <WalletsPanel
-                  embeddedAddress={walletProvider?.address}
-                  linkedWallets={linkedWallets}
-                  watchWallets={watchWallets}
-                  balances={portfolio.balances}
-                  balancesLoading={portfolio.loading}
-                  loading={walletsLoading}
-                  linkStatus={walletLinkStatus}
-                  onLinkExternal={linkExternalWallet}
-                  onConnectExternal={connectExternalWallet}
-                  onAddWatch={addWatchWallet}
-                  onRemoveWatch={removeWatchWallet}
-                  onRefreshBalances={portfolio.refresh}
-                />
-              ) : null}
 
               {activeSection === "beneficiaries" && walletProvider ? (
                 <BeneficiariesPanel

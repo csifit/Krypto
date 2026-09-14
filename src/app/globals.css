@@ -1331,3 +1331,276 @@ code {
 .readinessDot-blocked { background: #be123c; opacity: 1; }
 .readinessDot-checking { background: #ca8a04; opacity: 1; }
 @media (max-width: 560px) { .paymentReadinessHeader { display: grid; } .readinessOverall { justify-self: start; } }
+
+
+/* v0.13 dedicated My wallets page */
+.walletPageContent {
+  width: min(1180px, calc(100% - 64px));
+}
+
+.walletPageHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.walletPageLead {
+  max-width: 680px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.walletPageSummary {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.walletPageSummary strong,
+.walletPageSummary span {
+  display: block;
+}
+
+.walletPageSummary strong {
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.walletPageSummary span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.walletDirectoryPage {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 22px;
+}
+
+.walletPageActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.walletPageActions .walletDirectoryActions {
+  margin-top: 0;
+}
+
+.walletPageWatchForm {
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+}
+
+.walletPageWatchForm .errorText,
+.walletPageWatchForm .walletDirectoryActions {
+  grid-column: 1 / -1;
+}
+
+.walletAccordionList {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.walletAccordion {
+  border-bottom: 1px solid var(--line);
+}
+
+.walletAccordionSummary {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.25fr) minmax(115px, 0.8fr) minmax(110px, 0.7fr) 90px 18px;
+  gap: 16px;
+  align-items: center;
+  min-height: 66px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.walletAccordionSummary::-webkit-details-marker {
+  display: none;
+}
+
+.walletSummaryIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.walletSummaryIdentity > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.walletSummaryAddress {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.walletSummaryBalance {
+  font-size: 13px;
+}
+
+.walletSummaryStatus {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.walletAccordionChevron {
+  color: var(--muted);
+  font-size: 16px;
+  text-align: right;
+  transition: transform 150ms ease;
+}
+
+.walletAccordion[open] .walletAccordionChevron {
+  transform: rotate(180deg);
+}
+
+.walletAccordionBody {
+  padding: 4px 0 20px;
+}
+
+.walletDetailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.walletDetailGrid > div {
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 13px 14px;
+}
+
+.walletDetailGrid > div:nth-child(odd) {
+  border-right: 1px solid var(--line);
+}
+
+.walletDetailGrid > div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.walletDetailGrid span,
+.walletDetailGrid strong {
+  display: block;
+}
+
+.walletDetailGrid span {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.walletDetailGrid strong {
+  font-size: 13px;
+}
+
+.walletAccordionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.walletRemoveButton {
+  margin-left: auto;
+}
+
+.walletTechnicalLine {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.walletTechnicalLine strong {
+  color: var(--muted);
+}
+
+.walletPageLoading {
+  padding: 18px 0;
+}
+
+@media (max-width: 860px) {
+  .walletPageContent {
+    width: min(100% - 28px, 720px);
+  }
+
+  .walletPageHeader {
+    align-items: flex-start;
+  }
+
+  .walletAccordionSummary {
+    grid-template-columns: minmax(0, 1.4fr) minmax(100px, 0.8fr) 18px;
+  }
+
+  .walletSummaryAddress,
+  .walletSummaryStatus {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .walletPageHeader,
+  .walletPageActions {
+    display: block;
+  }
+
+  .walletPageSummary {
+    margin-top: 18px;
+    text-align: left;
+  }
+
+  .walletPageActions > .textButton {
+    margin-top: 12px;
+    padding-left: 0;
+  }
+
+  .walletPageWatchForm {
+    grid-template-columns: 1fr;
+  }
+
+  .walletAccordionSummary {
+    grid-template-columns: minmax(0, 1fr) auto 18px;
+    gap: 10px;
+  }
+
+  .walletSummaryBalance {
+    text-align: right;
+  }
+
+  .walletDetailGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .walletDetailGrid > div,
+  .walletDetailGrid > div:nth-child(odd),
+  .walletDetailGrid > div:nth-last-child(-n + 2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .walletDetailGrid > div:last-child {
+    border-bottom: 0;
+  }
+
+  .walletAccordionActions .primaryButton,
+  .walletAccordionActions .secondaryButton {
+    width: 100%;
+  }
+
+  .walletRemoveButton {
+    margin-left: 0;
+  }
+}

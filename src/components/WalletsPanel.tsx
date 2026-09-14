@@ -18,38 +18,19 @@ function formatBalance(value: string) {
   });
 }
 
-function BalanceLines({
-  address,
-  balances,
-  showNetworkFeeStatus = true,
-}: {
+type WalletRow = {
+  id: string;
+  label: string;
   address: `0x${string}`;
-  balances: Record<string, WalletBalanceSnapshot>;
-  showNetworkFeeStatus?: boolean;
-}) {
-  const snapshot = balances[address.toLowerCase()];
-
-  if (!snapshot) {
-    return <span className="walletBalanceMuted">Balance loading…</span>;
-  }
-
-  if (snapshot.error) {
-    return <span className="walletBalanceMuted">Balance unavailable</span>;
-  }
-
-  const hasNetworkFeeBalance = Number(snapshot.celo) > 0;
-
-  return (
-    <div className="walletBalanceLines">
-      <span><strong>{formatBalance(snapshot.usdt)}</strong> USDTd</span>
-      {showNetworkFeeStatus ? (
-        <span>
-          Network fees · <strong>{hasNetworkFeeBalance ? "Ready" : "Needs funds"}</strong>
-        </span>
-      ) : null}
-    </div>
-  );
-}
+  badge: string;
+  type: string;
+  ownership: string;
+  connection: string;
+  provider: string;
+  canPay: boolean;
+  needsConnect: boolean;
+  watchWalletId?: string;
+};
 
 export default function WalletsPanel({
   embeddedAddress,
@@ -64,6 +45,7 @@ export default function WalletsPanel({
   onRemoveWatch,
   onConnectExternal,
   onRefreshBalances,
+  onMakePayment,
 }: {
   embeddedAddress?: `0x${string}`;
   linkedWallets: LinkedWalletView[];
@@ -77,12 +59,14 @@ export default function WalletsPanel({
   onRemoveWatch(id: string): Promise<void>;
   onConnectExternal(): void;
   onRefreshBalances(): Promise<void>;
+  onMakePayment(address: `0x${string}`): void;
 }) {
   const [showWatchForm, setShowWatchForm] = useState(false);
   const [label, setLabel] = useState("");
   const [address, setAddress] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
 
   const knownAddresses = useMemo(() => {
     const values = new Set<string>();
@@ -90,6 +74,58 @@ export default function WalletsPanel({
     linkedWallets.forEach((wallet) => values.add(wallet.address.toLowerCase()));
     watchWallets.forEach((wallet) => values.add(wallet.address.toLowerCase()));
     return values;
+  }, [embeddedAddress, linkedWallets, watchWallets]);
+
+  const rows = useMemo<WalletRow[]>(() => {
+    const result: WalletRow[] = [];
+
+    if (embeddedAddress) {
+      result.push({
+        id: `embedded-${embeddedAddress.toLowerCase()}`,
+        label: "Krypto121 wallet",
+        address: embeddedAddress,
+        badge: "Active",
+        type: "Krypto121 wallet",
+        ownership: "User controlled",
+        connection: "Ready for payments",
+        provider: "Privy",
+        canPay: true,
+        needsConnect: false,
+      });
+    }
+
+    for (const wallet of linkedWallets) {
+      result.push({
+        id: `linked-${wallet.address.toLowerCase()}`,
+        label: wallet.provider,
+        address: wallet.address,
+        badge: "Linked",
+        type: "Linked wallet",
+        ownership: "Ownership verified",
+        connection: wallet.connected ? "Connected" : "Not connected",
+        provider: wallet.provider,
+        canPay: wallet.connected,
+        needsConnect: !wallet.connected,
+      });
+    }
+
+    for (const wallet of watchWallets) {
+      result.push({
+        id: `watch-${wallet.id}`,
+        label: wallet.label,
+        address: wallet.address,
+        badge: "Watch-only",
+        type: "Watch-only wallet",
+        ownership: "No ownership claim",
+        connection: "View only",
+        provider: "Address only",
+        canPay: false,
+        needsConnect: false,
+        watchWalletId: wallet.id,
+      });
+    }
+
+    return result;
   }, [embeddedAddress, linkedWallets, watchWallets]);
 
   async function submitWatch(event: React.FormEvent) {
@@ -105,7 +141,7 @@ export default function WalletsPanel({
     }
 
     if (!isAddress(trimmedAddress)) {
-      setFormError("Enter a valid EVM wallet address");
+      setFormError("Enter a valid wallet address");
       return;
     }
 
@@ -127,12 +163,28 @@ export default function WalletsPanel({
     }
   }
 
+  async function copyAddress(value: string) {
+    await navigator.clipboard.writeText(value);
+    setCopiedAddress(value.toLowerCase());
+    window.setTimeout(() => setCopiedAddress(null), 1400);
+  }
+
   return (
-    <section className="walletDirectory">
-      <div className="walletDirectoryHeader">
-        <div>
-          <p className="eyebrow">Wallet directory</p>
-          <h2>My wallets</h2>
+    <section className="walletDirectory walletDirectoryPage">
+      <div className="walletPageActions">
+        <div className="walletDirectoryActions">
+          <button className="primaryButton" onClick={onLinkExternal}>
+            Link existing wallet
+          </button>
+          <button
+            className="secondaryButton"
+            onClick={() => {
+              setShowWatchForm((value) => !value);
+              setFormError(null);
+            }}
+          >
+            Add watch-only
+          </button>
         </div>
         <button
           className="textButton"
@@ -143,29 +195,10 @@ export default function WalletsPanel({
         </button>
       </div>
 
-      <p className="muted walletDirectoryIntro">
-        Link wallets you control or save an address as watch-only. Krypto121 reads wallet balances without taking custody.
-      </p>
-
-      <div className="walletDirectoryActions">
-        <button className="primaryButton" onClick={onLinkExternal}>
-          Link existing wallet
-        </button>
-        <button
-          className="secondaryButton"
-          onClick={() => {
-            setShowWatchForm((value) => !value);
-            setFormError(null);
-          }}
-        >
-          Add watch-only
-        </button>
-      </div>
-
       {linkStatus ? <p className="walletActionStatus">{linkStatus}</p> : null}
 
       {showWatchForm ? (
-        <form className="watchWalletForm" onSubmit={submitWatch}>
+        <form className="watchWalletForm walletPageWatchForm" onSubmit={submitWatch}>
           <label>
             <span>Label</span>
             <input
@@ -202,78 +235,132 @@ export default function WalletsPanel({
         </form>
       ) : null}
 
-      <div className="walletList">
-        {embeddedAddress ? (
-          <article className="walletListItem">
-            <div>
-              <div className="walletListTitleRow">
-                <strong>Krypto121 wallet</strong>
-                <span className="walletBadge">Active</span>
+      <div className="walletAccordionList">
+        {rows.map((wallet) => {
+          const snapshot = balances[wallet.address.toLowerCase()];
+          const balanceText = snapshot?.error
+            ? "Unavailable"
+            : snapshot
+              ? `${formatBalance(snapshot.usdt)} USDTd`
+              : "Loading…";
+          const networkReady = snapshot ? Number(snapshot.celo) > 0 : false;
+
+          return (
+            <details className="walletAccordion" key={wallet.id}>
+              <summary className="walletAccordionSummary">
+                <div className="walletSummaryIdentity">
+                  <strong>{wallet.label}</strong>
+                  <span className={wallet.badge === "Watch-only" ? "walletBadge walletBadgeQuiet" : "walletBadge"}>
+                    {wallet.badge}
+                  </span>
+                </div>
+                <span className="walletSummaryAddress">{shortAddress(wallet.address)}</span>
+                <strong className="walletSummaryBalance">{balanceText}</strong>
+                <span className="walletSummaryStatus">
+                  {wallet.canPay ? "Ready" : wallet.needsConnect ? "Connect" : "View only"}
+                </span>
+                <span className="walletAccordionChevron" aria-hidden="true">⌄</span>
+              </summary>
+
+              <div className="walletAccordionBody">
+                <div className="walletDetailGrid">
+                  <div>
+                    <span>Wallet type</span>
+                    <strong>{wallet.type}</strong>
+                  </div>
+                  <div>
+                    <span>Full address</span>
+                    <strong className="breakWord">{wallet.address}</strong>
+                  </div>
+                  <div>
+                    <span>Ownership</span>
+                    <strong>{wallet.ownership}</strong>
+                  </div>
+                  <div>
+                    <span>Connection</span>
+                    <strong>{wallet.connection}</strong>
+                  </div>
+                  <div>
+                    <span>Balance</span>
+                    <strong>{balanceText}</strong>
+                  </div>
+                  <div>
+                    <span>Network fees</span>
+                    <strong>
+                      {wallet.type === "Watch-only wallet"
+                        ? "Not applicable"
+                        : snapshot?.error
+                          ? "Unavailable"
+                          : snapshot
+                            ? networkReady ? "Ready" : "Needs funds"
+                            : "Loading…"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Provider</span>
+                    <strong>{wallet.provider}</strong>
+                  </div>
+                  <div>
+                    <span>Environment</span>
+                    <strong>Test</strong>
+                  </div>
+                </div>
+
+                <div className="walletAccordionActions">
+                  <button
+                    className="primaryButton"
+                    onClick={() => onMakePayment(wallet.address)}
+                    disabled={!wallet.canPay}
+                  >
+                    Make payment from this wallet
+                  </button>
+
+                  {wallet.needsConnect ? (
+                    <button className="secondaryButton" onClick={onConnectExternal}>
+                      Connect wallet
+                    </button>
+                  ) : null}
+
+                  <button
+                    className="secondaryButton"
+                    onClick={() => void copyAddress(wallet.address)}
+                  >
+                    {copiedAddress === wallet.address.toLowerCase() ? "Copied" : "Copy address"}
+                  </button>
+
+                  {wallet.watchWalletId ? (
+                    <button
+                      className="textButton walletRemoveButton"
+                      onClick={() => void onRemoveWatch(wallet.watchWalletId!)}
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+
+                {!wallet.canPay ? (
+                  <p className="walletDirectoryNote">
+                    {wallet.needsConnect
+                      ? "Connect this linked wallet before making a payment from it."
+                      : "Watch-only wallets can be monitored, but they cannot sign or make payments."}
+                  </p>
+                ) : null}
+
+                <div className="walletTechnicalLine">
+                  <span>Technical:</span>
+                  <strong>Celo Sepolia · Test USDT</strong>
+                </div>
               </div>
-              <span className="walletListAddress">{shortAddress(embeddedAddress)}</span>
-              <BalanceLines address={embeddedAddress} balances={balances} />
-            </div>
-            <div className="walletListMeta">
-              <span>Embedded</span>
-              <span>User controlled</span>
-            </div>
-          </article>
-        ) : null}
+            </details>
+          );
+        })}
 
-        {linkedWallets.map((wallet) => (
-          <article className="walletListItem" key={`linked-${wallet.address}`}>
-            <div>
-              <div className="walletListTitleRow">
-                <strong>{wallet.provider}</strong>
-                <span className="walletBadge">Linked</span>
-              </div>
-              <span className="walletListAddress">{shortAddress(wallet.address)}</span>
-              <BalanceLines address={wallet.address} balances={balances} />
-            </div>
-            <div className="walletListMeta">
-              <span>Ownership verified</span>
-              {wallet.connected ? (
-                <span>Connected now</span>
-              ) : (
-                <button className="textButton" onClick={onConnectExternal}>
-                  Connect for payment
-                </button>
-              )}
-            </div>
-          </article>
-        ))}
-
-        {watchWallets.map((wallet) => (
-          <article className="walletListItem" key={`watch-${wallet.id}`}>
-            <div>
-              <div className="walletListTitleRow">
-                <strong>{wallet.label}</strong>
-                <span className="walletBadge walletBadgeQuiet">Watch-only</span>
-              </div>
-              <span className="walletListAddress">{shortAddress(wallet.address)}</span>
-              <BalanceLines address={wallet.address} balances={balances} showNetworkFeeStatus={false} />
-            </div>
-            <div className="walletListMeta">
-              <span>View only · excluded from owned total</span>
-              <button
-                className="textButton"
-                onClick={() => void onRemoveWatch(wallet.id)}
-              >
-                Remove
-              </button>
-            </div>
-          </article>
-        ))}
-
-        {!embeddedAddress && linkedWallets.length === 0 && watchWallets.length === 0 && !loading ? (
-          <p className="muted">No wallets yet.</p>
-        ) : null}
-
-        {loading ? <p className="muted">Loading wallets…</p> : null}
+        {!rows.length && !loading ? <p className="muted">No wallets yet.</p> : null}
+        {loading ? <p className="muted walletPageLoading">Loading wallets…</p> : null}
       </div>
 
       <p className="walletDirectoryNote">
-        Owned balance totals include the embedded wallet and verified linked wallets. Watch-only wallets are monitored separately and can never sign or move funds.
+        Watch-only wallets are excluded from your owned balance and can never make payments.
       </p>
     </section>
   );

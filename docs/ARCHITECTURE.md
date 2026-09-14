@@ -252,18 +252,21 @@ Keep blockchain mechanics out of the normal product experience while retaining t
 Generate QR/payment links for Receive and scan/open them to populate a PaymentIntent. Complete.
 
 ### M11 — Payment readiness / fee preflight
-Check source balance, network-fee readiness, recipient validity, and route readiness before approval. **Current.**
+Check source balance, network-fee readiness, recipient validity, and route readiness before approval. Complete.
 
-### M12 — Router expansion
+### M12 — Dedicated wallet management
+Move My wallets to a full page with compact accordion rows and direct payment-source actions. **Current.**
+
+### M13 — Router expansion
 Add an alternative route only when we have a concrete route/provider to compare with direct settlement.
 
-### M13 — Gas UX
+### M14 — Gas UX
 Hide native-token complexity using the safest supported mechanism.
 
-### M14 — External settlement rails
+### M15 — External settlement rails
 Off-ramp / FX / CBDC integrations through regulated providers.
 
-### M15 — Mainnet preparation
+### M16 — Mainnet preparation
 Security review, monitoring, production RPC, compliance boundaries, and mainnet guardrails.
 
 ## Principle
@@ -390,3 +393,24 @@ v0.11 requests are stateless and encoded in the payment link. This keeps the mil
 ## v0.12 — Payment readiness / fee preflight
 
 Before a PaymentIntent advances to quote/review, Krypto121 evaluates recipient validity, stablecoin balance, estimated network-fee readiness and direct-route availability. Preflight is read-only and never signs, approves, or sends a transaction.
+
+
+## v0.13 — Dedicated My wallets page
+
+Wallet management moves from a narrow dashboard side panel to `/wallets`.
+
+```text
+My wallets
+  |
+  +-- one compact row per wallet
+          |
+          +-- basic balance / status
+          +-- expandable details
+          +-- Make payment from this wallet
+```
+
+The payment action does not create a new payment system. It reuses the existing Send flow and preselects the chosen signing wallet as `PaymentIntent.sourceWallet`.
+
+Watch-only wallets remain visible but cannot be selected as payment sources. Linked wallets must be connected before they can sign.
+
+The page structure deliberately leaves room for future wallet/network types such as Bitcoin without adding Bitcoin transaction logic yet.

@@ -2,11 +2,36 @@
 
 **Krypto121 is a smart payment-routing wallet. Create a wallet or bring the wallets you already use. Manage them from one place.**
 
-## v0.12 — Payment readiness / fee preflight
+## v0.13 — Dedicated My wallets page
 
-Before Send can advance to review, Krypto121 checks recipient validity, source-wallet USDTd balance, network-fee readiness and direct-route availability.
+`My wallets` now has its own full page:
 
-The normal UI does not expose CELO. It reports only payment readiness states.
+```text
+/wallets
+```
+
+Each wallet is shown as a compact one-line accordion. The top row shows only the essentials:
+
+```text
+Wallet | address | balance | status
+```
+
+Expand a wallet to see its full details and actions.
+
+Owned, connected wallets include **Make payment from this wallet**, which opens the existing Send flow with that wallet preselected.
+
+Watch-only wallets remain view-only and cannot make payments.
+
+### Retained wallet actions
+
+- Link existing wallet
+- Add watch-only wallet
+- Connect linked wallet
+- Refresh balances
+- Copy address
+- Remove watch-only wallet
+
+### Upgrade
 
 No Supabase migration and no new environment variables are required.
 
@@ -15,4 +40,4 @@ npm install
 npm run build
 ```
 
-See `docs/upgrades/UPGRADE-v0.12.md`.
+See `docs/upgrades/UPGRADE-v0.13.md`.

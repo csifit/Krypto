@@ -29,12 +29,14 @@ export default function SendPanel({
   sourceWallets,
   beneficiaries,
   initialRequest,
+  initialSourceAddress,
   onSent,
 }: {
   accountWalletAddress: `0x${string}`;
   sourceWallets: PaymentSourceWallet[];
   beneficiaries: Beneficiary[];
   initialRequest?: PaymentRequest;
+  initialSourceAddress?: `0x${string}`;
   onSent(): Promise<void>;
 }) {
   const [sourceId, setSourceId] = useState(
@@ -65,6 +67,14 @@ export default function SendPanel({
     setError(null);
     setStage("form");
   }, [initialRequest]);
+
+  useEffect(() => {
+    if (!initialSourceAddress) return;
+    const match = sourceWallets.find(
+      (source) => source.wallet.address.toLowerCase() === initialSourceAddress.toLowerCase(),
+    );
+    if (match) setSourceId(match.id);
+  }, [initialSourceAddress, sourceWallets]);
 
   function applyScannedPayment(value: string) {
     const request = parsePaymentRequestPayload(value);

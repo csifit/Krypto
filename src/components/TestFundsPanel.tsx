@@ -32,7 +32,7 @@ export default function TestFundsPanel({
       setError(
         err instanceof Error
           ? err.message
-          : "Could not mint development test tokens",
+          : "Could not approve the development transaction",
       );
     }
   }
@@ -42,11 +42,10 @@ export default function TestFundsPanel({
   return (
     <section className="panel testFundsPanel">
       <span className="status">Development only</span>
-      <h2>Get test funds</h2>
+      <h2>Test funds</h2>
       <p>
-        Test transactions need a small amount of test CELO for gas. After that,
-        mint 100 USDTd to this wallet. USDTd is a publicly mintable test token,
-        not real Tether.
+        Add test CELO for gas, then approve a development-only transaction that
+        adds 100 USDTd to this wallet. USDTd has no real-world value.
       </p>
 
       <div className="fundingStatus">
@@ -70,21 +69,19 @@ export default function TestFundsPanel({
           onClick={() => void mint()}
           disabled={status === "minting" || !hasCelo}
         >
-          {status === "minting" ? "Minting…" : "Mint 100 USDTd"}
+          {status === "minting" ? "Waiting for approval…" : "Approve transaction"}
         </button>
       </div>
 
       {!hasCelo ? (
-        <p className="hint">
-          Get test CELO first, then refresh the account balance above.
-        </p>
+        <p className="hint">Get test CELO first, then refresh your balance.</p>
       ) : null}
 
       {error ? <p className="errorText">{error}</p> : null}
 
       {status === "success" && hash ? (
         <p className="successText">
-          Test tokens minted.{" "}
+          Test transaction approved. 100 USDTd added.{" "}
           <a
             className="inlineLink inlineLinkNoMargin"
             href={`https://celo-sepolia.blockscout.com/tx/${hash}`}

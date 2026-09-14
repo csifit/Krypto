@@ -5,7 +5,23 @@
   --muted: #666d78;
   --line: #e5e7eb;
   --accent: #111827;
+  --accent-contrast: #ffffff;
   --soft: #eef1f4;
+  --sidebar: #ffffff;
+  --shadow: 0 18px 55px rgba(17, 24, 39, 0.08);
+}
+
+:root[data-theme="dark"] {
+  --background: #0f1115;
+  --surface: #171a20;
+  --foreground: #f3f4f6;
+  --muted: #9ca3af;
+  --line: #2a2f38;
+  --accent: #f3f4f6;
+  --accent-contrast: #111318;
+  --soft: #22262e;
+  --sidebar: #13161b;
+  --shadow: 0 18px 55px rgba(0, 0, 0, 0.28);
 }
 
 * {
@@ -163,7 +179,7 @@ h1 {
 
 .primaryButton {
   border: 1px solid var(--accent);
-  color: white;
+  color: var(--accent-contrast);
   background: var(--accent);
 }
 
@@ -459,5 +475,464 @@ code {
     margin-top: 10px;
     min-width: 0;
     text-align: left;
+  }
+}
+
+/* v0.5 simplified application shell */
+.landingShell {
+  width: min(1180px, calc(100% - 36px));
+  min-height: 100vh;
+  margin: 0 auto;
+}
+
+.landingHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 76px;
+}
+
+.landingHeader > strong {
+  font-size: 20px;
+  letter-spacing: -0.03em;
+}
+
+.landingHero {
+  display: flex;
+  min-height: calc(100vh - 110px);
+  flex-direction: column;
+  justify-content: center;
+  padding: 54px 0 86px;
+}
+
+.landingHero h1 {
+  max-width: 920px;
+}
+
+.landingLead {
+  max-width: 690px;
+  margin: 26px 0 0;
+  color: var(--muted);
+  font-size: clamp(18px, 2vw, 22px);
+  line-height: 1.55;
+}
+
+.landingCta {
+  align-self: flex-start;
+  margin-top: 30px;
+}
+
+.advantageStrip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 70px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--line);
+}
+
+.advantageStrip span {
+  background: var(--surface);
+  padding: 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.advantageStrip strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--foreground);
+}
+
+.themeToggle {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0 13px;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.themeToggleCompact {
+  width: 42px;
+  justify-content: center;
+  padding: 0;
+}
+
+.dashboardApp {
+  min-height: 100vh;
+}
+
+.dashboardSidebar {
+  position: fixed;
+  z-index: 40;
+  inset: 0 auto 0 0;
+  display: flex;
+  width: 250px;
+  flex-direction: column;
+  justify-content: space-between;
+  border-right: 1px solid var(--line);
+  background: var(--sidebar);
+  padding: 28px 18px 22px;
+}
+
+.sidebarBrand {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 8px 26px;
+}
+
+.sidebarBrand strong {
+  font-size: 21px;
+  letter-spacing: -0.04em;
+}
+
+.sidebarBrand span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sidebarNav {
+  display: grid;
+  gap: 5px;
+}
+
+.sidebarNavItem,
+.sidebarSignOut {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  padding: 11px 12px;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebarNavItem:hover,
+.sidebarSignOut:hover,
+.sidebarNavItemActive {
+  background: var(--soft);
+  color: var(--foreground);
+}
+
+.sidebarFooter {
+  display: grid;
+  gap: 12px;
+}
+
+.sidebarFooter .themeToggle {
+  width: 100%;
+}
+
+.sidebarAccount {
+  border-top: 1px solid var(--line);
+  padding: 14px 10px 0;
+}
+
+.sidebarAccount span,
+.sidebarAccount small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebarAccount span {
+  font-size: 13px;
+}
+
+.sidebarAccount small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.dashboardMain {
+  min-height: 100vh;
+  margin-left: 250px;
+}
+
+.mobileTopbar {
+  display: none;
+}
+
+.dashboardContent {
+  width: min(1240px, calc(100% - 64px));
+  margin: 0 auto;
+  padding: 52px 0 70px;
+}
+
+.dashboardContentWithSide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+  gap: 18px;
+  width: min(1460px, calc(100% - 48px));
+}
+
+.dashboardPrimary {
+  min-width: 0;
+}
+
+.dashboardHeading {
+  margin-bottom: 26px;
+}
+
+.dashboardCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboardCard {
+  min-height: 185px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 22px;
+}
+
+.cardLabel,
+.cardSubtle {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.walletAddressShort,
+.cardActionTitle {
+  display: block;
+  margin-top: 25px;
+  font-size: clamp(22px, 3vw, 31px);
+  letter-spacing: -0.04em;
+}
+
+.balanceCompact {
+  display: block;
+  margin-top: 22px;
+  font-size: clamp(30px, 4vw, 44px);
+  letter-spacing: -0.05em;
+}
+
+.cardSubtle {
+  margin-top: 3px;
+}
+
+.cardHeaderCompact,
+.cardActionsCompact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardActionsCompact {
+  justify-content: flex-start;
+  margin-top: 20px;
+}
+
+.cardPrimaryActions {
+  display: flex;
+  gap: 9px;
+  margin-top: 20px;
+}
+
+.textLink {
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.secondarySideCard {
+  align-self: start;
+  max-height: calc(100vh - 104px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 22px;
+}
+
+.sideCardHeader {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.secondarySideCard .businessPanel,
+.secondarySideCard .testFundsPanel {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.developerFacts {
+  display: grid;
+  gap: 0;
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.developerFacts > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding: 13px 0;
+}
+
+.developerFacts span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.developerFacts strong {
+  font-size: 13px;
+  text-align: right;
+}
+
+.sidebarBackdrop {
+  display: none;
+}
+
+.hamburgerButton {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-content: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.hamburgerButton span {
+  display: block;
+  width: 17px;
+  height: 1px;
+  background: var(--foreground);
+}
+
+@media (max-width: 1180px) {
+  .dashboardContentWithSide {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+
+  .dashboardContentWithSide .dashboardCards {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboardContentWithSide .dashboardCard {
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 860px) {
+  .dashboardSidebar {
+    width: min(82vw, 300px);
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+    box-shadow: var(--shadow);
+  }
+
+  .dashboardSidebarOpen {
+    transform: translateX(0);
+  }
+
+  .sidebarBackdrop {
+    position: fixed;
+    z-index: 35;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, 0.42);
+  }
+
+  .dashboardMain {
+    margin-left: 0;
+  }
+
+  .mobileTopbar {
+    position: sticky;
+    z-index: 20;
+    top: 0;
+    display: flex;
+    min-height: 68px;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--background) 92%, transparent);
+    padding: 0 18px;
+    backdrop-filter: blur(14px);
+  }
+
+  .dashboardContent,
+  .dashboardContentWithSide {
+    display: block;
+    width: min(100% - 28px, 720px);
+    padding: 30px 0 50px;
+  }
+
+  .dashboardCards {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboardCard {
+    min-height: 150px;
+  }
+
+  .secondarySideCard {
+    max-height: none;
+    margin-top: 16px;
+  }
+
+  .advantageStrip {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .landingShell {
+    width: min(100% - 28px, 520px);
+  }
+
+  .landingHero {
+    min-height: auto;
+    padding: 72px 0 54px;
+  }
+
+  .landingHero h1 {
+    font-size: clamp(44px, 14vw, 64px);
+  }
+
+  .advantageStrip {
+    margin-top: 48px;
+  }
+
+  .dashboardHeading {
+    margin-bottom: 18px;
+  }
+
+  .dashboardTitle {
+    font-size: 31px;
+  }
+
+  .cardPrimaryActions .primaryButton,
+  .cardPrimaryActions .secondaryButton {
+    flex: 1;
   }
 }

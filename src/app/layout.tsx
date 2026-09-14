@@ -4,7 +4,7 @@ import Providers from "@/components/Providers";
 
 export const metadata: Metadata = {
   title: "Krypto",
-  description: "A business-first stablecoin payments platform.",
+  description: "Non-custodial stablecoin payments with smart routing.",
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
         <Providers>{children}</Providers>
       </body>

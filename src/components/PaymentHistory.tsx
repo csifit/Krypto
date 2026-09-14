@@ -23,7 +23,7 @@ export default function PaymentHistory({
 
   return (
     <section className="businessPanel">
-      <p className="eyebrow">Local records · v0.4</p>
+      <p className="eyebrow">Local records</p>
       <h2>Payment history</h2>
       <p className="muted">
         These records are browser-local annotations. The blockchain remains the

@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import BeneficiariesPanel from "@/components/BeneficiariesPanel";
+import DashboardSidebar, { type SecondarySection } from "@/components/DashboardSidebar";
 import PaymentHistory from "@/components/PaymentHistory";
 import ReceivePanel from "@/components/ReceivePanel";
 import SendPanel from "@/components/SendPanel";
 import TestFundsPanel from "@/components/TestFundsPanel";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useCeloBalance } from "@/hooks/useCeloBalance";
 import { useUsdtBalance } from "@/hooks/useUsdtBalance";
 import { celoSepolia } from "@/lib/celo";
+import { loadBeneficiaries } from "@/lib/payments/localStore";
 import type { Beneficiary } from "@/lib/payments/types";
 import { createPrivyWalletProvider } from "@/lib/wallet/privy";
 
@@ -32,8 +35,11 @@ export default function WalletDashboard() {
   const { wallets, ready: walletsReady } = useWallets();
   const [showReceive, setShowReceive] = useState(false);
   const [showSend, setShowSend] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<SecondarySection>(null);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   const embeddedWallet = wallets.find(
     (wallet) => wallet.walletClientType === "privy",
@@ -47,9 +53,24 @@ export default function WalletDashboard() {
   const usdt = useUsdtBalance(walletProvider?.address);
   const celo = useCeloBalance(walletProvider?.address);
 
+  useEffect(() => {
+    if (!walletProvider?.address) {
+      setBeneficiaries([]);
+      return;
+    }
+    setBeneficiaries(loadBeneficiaries(walletProvider.address));
+  }, [walletProvider?.address]);
+
   async function refreshAll() {
     await Promise.all([usdt.refresh(), celo.refresh()]);
     setHistoryRefreshKey((value) => value + 1);
+  }
+
+  async function copyWallet() {
+    if (!walletProvider) return;
+    await navigator.clipboard.writeText(walletProvider.address);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
   }
 
   if (!ready || !walletsReady) {
@@ -64,162 +85,195 @@ export default function WalletDashboard() {
 
   if (!authenticated) {
     return (
-      <main className="shell">
-        <section className="hero">
-          <div>
-            <p className="eyebrow">Krypto Business</p>
-            <h1>Send digital dollars globally.</h1>
-            <p className="lead">
-              Start with a user-owned stablecoin wallet on Celo. Development
-              uses test tokens only; production remains USDT-first.
-            </p>
-            <button className="primaryButton" onClick={login}>
-              Create account
-            </button>
+      <main className="landingShell">
+        <header className="landingHeader">
+          <strong>Krypto</strong>
+          <ThemeToggle compact />
+        </header>
+
+        <section className="landingHero">
+          <p className="eyebrow">Krypto Business</p>
+          <h1>One wallet. Smarter global payments.</h1>
+          <p className="landingLead">
+            Krypto finds the route. You approve the payment. Your funds stay under your control.
+          </p>
+          <button className="primaryButton landingCta" onClick={login}>
+            Create account/Log in
+          </button>
+
+          <div className="advantageStrip" aria-label="Why Krypto">
+            <span><strong>You control funds.</strong> Non-custodial wallet.</span>
+            <span><strong>Krypto finds the route.</strong> Less payment complexity.</span>
+            <span><strong>Costs are clear.</strong> Review before approval.</span>
           </div>
-        </section>
-
-        <section className="grid">
-          <article className="panel">
-            <span className="status">V1 target</span>
-            <h2>USDT</h2>
-            <p>Our first production stablecoin.</p>
-          </article>
-
-          <article className="panel">
-            <span className="status">Network</span>
-            <h2>Celo</h2>
-            <p>Celo Sepolia is used while we build the payment flow.</p>
-          </article>
-
-          <article className="panel">
-            <span className="status">Router</span>
-            <h2>Payment intents</h2>
-            <p>Krypto chooses the settlement route; the user authorizes it.</p>
-          </article>
         </section>
       </main>
     );
   }
 
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Krypto Business · Development</p>
-          <h1 className="dashboardTitle">Account</h1>
-        </div>
-        <button className="secondaryButton" onClick={logout}>
-          Sign out
-        </button>
-      </header>
+    <div className="dashboardApp">
+      <DashboardSidebar
+        open={menuOpen}
+        activeSection={activeSection}
+        email={user?.email?.address}
+        onClose={() => setMenuOpen(false)}
+        onSelect={setActiveSection}
+        onLogout={logout}
+      />
 
-      <section className="balanceCard">
-        <div className="balanceHeader">
-          <div>
-            <p className="balanceLabel">Available test balance</p>
-            <p className="balance">
-              {usdt.loading ? "…" : `${formatBalance(usdt.balance)} USDTd`}
-            </p>
-            <p className="muted">Celo Sepolia · no real-world value</p>
+      <main className="dashboardMain">
+        <header className="mobileTopbar">
+          <button
+            className="hamburgerButton"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+          <strong>Krypto</strong>
+          <ThemeToggle compact />
+        </header>
+
+        <div className={activeSection ? "dashboardContent dashboardContentWithSide" : "dashboardContent"}>
+          <div className="dashboardPrimary">
+            <header className="dashboardHeading">
+              <div>
+                <p className="eyebrow">Krypto Business · Development</p>
+                <h1 className="dashboardTitle">Overview</h1>
+              </div>
+            </header>
+
+            <section className="dashboardCards">
+              <article className="dashboardCard">
+                <span className="cardLabel">My wallet</span>
+                <strong className="walletAddressShort">{shortAddress(walletProvider?.address)}</strong>
+                <div className="cardActionsCompact">
+                  <button className="textButton" onClick={() => void copyWallet()} disabled={!walletProvider}>
+                    {copied ? "Copied" : "Copy address"}
+                  </button>
+                  {walletProvider ? (
+                    <a
+                      className="textLink"
+                      href={`https://celo-sepolia.blockscout.com/address/${walletProvider.address}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Explorer
+                    </a>
+                  ) : null}
+                </div>
+              </article>
+
+              <article className="dashboardCard">
+                <div className="cardHeaderCompact">
+                  <span className="cardLabel">Balance</span>
+                  <button className="textButton" onClick={() => void refreshAll()}>
+                    Refresh
+                  </button>
+                </div>
+                <strong className="balanceCompact">
+                  {usdt.loading ? "…" : formatBalance(usdt.balance)}
+                </strong>
+                <span className="cardSubtle">USDTd · testnet</span>
+              </article>
+
+              <article className="dashboardCard">
+                <span className="cardLabel">Send / Receive</span>
+                <strong className="cardActionTitle">Move funds</strong>
+                <div className="cardPrimaryActions">
+                  <button
+                    className="primaryButton"
+                    disabled={!walletProvider}
+                    onClick={() => {
+                      setShowSend((value) => !value);
+                      setShowReceive(false);
+                    }}
+                  >
+                    Send
+                  </button>
+                  <button
+                    className="secondaryButton"
+                    disabled={!walletProvider}
+                    onClick={() => {
+                      setShowReceive((value) => !value);
+                      setShowSend(false);
+                    }}
+                  >
+                    Receive
+                  </button>
+                </div>
+              </article>
+            </section>
+
+            {usdt.error ? <p className="errorText">Balance error: {usdt.error}</p> : null}
+            {celo.error ? <p className="errorText">Gas error: {celo.error}</p> : null}
+
+            {showSend && walletProvider ? (
+              <SendPanel
+                wallet={walletProvider}
+                balance={usdt.balance}
+                beneficiaries={beneficiaries}
+                onSent={refreshAll}
+              />
+            ) : null}
+
+            {showReceive && walletProvider ? (
+              <ReceivePanel address={walletProvider.address} />
+            ) : null}
           </div>
-          <button className="textButton" onClick={() => void refreshAll()}>
-            Refresh
-          </button>
-        </div>
 
-        {usdt.error ? (
-          <p className="errorText">Balance error: {usdt.error}</p>
-        ) : null}
-        {celo.error ? <p className="errorText">Gas error: {celo.error}</p> : null}
+          {activeSection ? (
+            <aside className="secondarySideCard">
+              <div className="sideCardHeader">
+                <button className="textButton" onClick={() => setActiveSection(null)}>
+                  Close
+                </button>
+              </div>
 
-        <div className="actions">
-          <button
-            className="primaryButton"
-            disabled={!walletProvider}
-            onClick={() => {
-              setShowSend((value) => !value);
-              setShowReceive(false);
-            }}
-          >
-            {showSend ? "Hide send" : "Send"}
-          </button>
-          <button
-            className="secondaryButton"
-            disabled={!walletProvider}
-            onClick={() => {
-              setShowReceive((value) => !value);
-              setShowSend(false);
-            }}
-          >
-            {showReceive ? "Hide receive" : "Receive"}
-          </button>
-        </div>
-      </section>
+              {activeSection === "beneficiaries" && walletProvider ? (
+                <BeneficiariesPanel
+                  walletAddress={walletProvider.address}
+                  onChange={setBeneficiaries}
+                />
+              ) : null}
 
-      {showSend && walletProvider ? (
-        <SendPanel
-          wallet={walletProvider}
-          balance={usdt.balance}
-          beneficiaries={beneficiaries}
-          onSent={refreshAll}
-        />
-      ) : null}
+              {activeSection === "history" && walletProvider ? (
+                <PaymentHistory
+                  walletAddress={walletProvider.address}
+                  refreshKey={historyRefreshKey}
+                />
+              ) : null}
 
-      {showReceive && walletProvider ? (
-        <ReceivePanel address={walletProvider.address} />
-      ) : null}
-
-      {walletProvider ? (
-        <TestFundsPanel
-          wallet={walletProvider}
-          celoBalance={celo.balance}
-          onFunded={refreshAll}
-        />
-      ) : null}
-
-      <section className="grid">
-        <article className="panel">
-          <span className="status">Wallet</span>
-          <h2>{shortAddress(walletProvider?.address)}</h2>
-          <p className="breakWord">{walletProvider?.address}</p>
-          {walletProvider ? (
-            <a
-              className="inlineLink"
-              href={`https://celo-sepolia.blockscout.com/address/${walletProvider.address}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open in explorer
-            </a>
+              {activeSection === "developer" && walletProvider ? (
+                <div className="developerSideContent">
+                  <TestFundsPanel
+                    wallet={walletProvider}
+                    celoBalance={celo.balance}
+                    onFunded={refreshAll}
+                  />
+                  <div className="developerFacts">
+                    <div>
+                      <span>Network</span>
+                      <strong>Celo Sepolia</strong>
+                    </div>
+                    <div>
+                      <span>Wallet provider</span>
+                      <strong>Privy · replaceable</strong>
+                    </div>
+                    <div>
+                      <span>Route</span>
+                      <strong>Direct Celo</strong>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </aside>
           ) : null}
-        </article>
-
-        <article className="panel">
-          <span className="status">Account</span>
-          <h2>Authenticated</h2>
-          <p>{user?.email?.address ?? "Privy user"}</p>
-        </article>
-
-        <article className="panel">
-          <span className="status">Router</span>
-          <h2>Direct Celo</h2>
-          <p>One route enabled. Krypto fee is 0 for development.</p>
-        </article>
-      </section>
-
-      {walletProvider ? (
-        <>
-          <BeneficiariesPanel
-            walletAddress={walletProvider.address}
-            onChange={setBeneficiaries}
-          />
-          <PaymentHistory
-            walletAddress={walletProvider.address}
-            refreshKey={historyRefreshKey}
-          />
-        </>
-      ) : null}
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }

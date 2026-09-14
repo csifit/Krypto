@@ -84,8 +84,7 @@ export default function BeneficiariesPanel({
       <p className="eyebrow">Business primitives</p>
       <h2>Beneficiaries</h2>
       <p className="muted">
-        Saved locally in this browser for v0.4. They are not yet synced to a
-        Krypto backend.
+        Saved locally in this browser for now. Backend sync comes in the next data milestone.
       </p>
 
       {beneficiaries.length ? (

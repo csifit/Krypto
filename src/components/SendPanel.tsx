@@ -5,6 +5,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { isAddress } from "viem";
 import { sendTestUsdt } from "@/lib/blockchain/usdt";
 import { useUsdtBalance } from "@/hooks/useUsdtBalance";
+import { usePaymentReadiness } from "@/hooks/usePaymentReadiness";
 import {
   createDirectCeloIntent,
   quoteDirectCeloIntent,
@@ -91,6 +92,15 @@ export default function SendPanel({
     (item) => item.address.toLowerCase() === recipient.toLowerCase(),
   );
 
+  const readiness = usePaymentReadiness({
+    sourceAddress: selectedSource?.wallet.address,
+    sourceBalance: sourceBalance.balance,
+    sourceBalanceLoading: sourceBalance.loading,
+    sourceBalanceError: sourceBalance.error,
+    recipient,
+    amount,
+  });
+
   const validationError = useMemo(() => {
     if (!recipient || !amount) return null;
     if (!isAddress(recipient)) return "Enter a valid wallet address";
@@ -117,16 +127,20 @@ export default function SendPanel({
       setError("Connect a wallet before creating a payment");
       return;
     }
-    if (sourceBalance.loading) {
-      setError("Wait for the selected wallet balance to load");
-      return;
-    }
     if (!recipient || !amount) {
       setError("Enter a recipient and amount");
       return;
     }
     if (validationError) {
       setError(validationError);
+      return;
+    }
+    if (readiness.checking) {
+      setError("Wait for payment readiness checks to finish");
+      return;
+    }
+    if (!readiness.ready) {
+      setError("Resolve the payment readiness checks before continuing");
       return;
     }
 
@@ -429,6 +443,36 @@ export default function SendPanel({
         />
       </label>
 
+      <div className="paymentReadiness">
+        <div className="paymentReadinessHeader">
+          <div>
+            <p className="eyebrow">Payment readiness</p>
+            <h3>{readiness.ready ? "Ready to review" : "Preflight checks"}</h3>
+          </div>
+          <span className={`readinessOverall readinessOverall-${readiness.ready ? "ready" : readiness.checking ? "checking" : "pending"}`}>
+            {readiness.ready ? "Ready" : readiness.checking ? "Checking" : "Not ready"}
+          </span>
+        </div>
+
+        <div className="readinessList">
+          {[readiness.recipient, readiness.funds, readiness.network, readiness.route].map((check) => (
+            <div className="readinessRow" key={check.label}>
+              <span className={`readinessDot readinessDot-${check.state}`} aria-hidden="true" />
+              <div>
+                <strong>{check.label}</strong>
+                <span>{check.detail}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {readiness.network.state === "blocked" && readiness.route.state === "ready" ? (
+          <p className="walletDirectoryNote">
+            This source wallet needs test network funds before it can send. Krypto121 keeps the underlying network token out of the normal payment flow.
+          </p>
+        ) : null}
+      </div>
+
       <p className="hint">
         Available in selected wallet: {sourceBalance.loading ? "…" : sourceBalance.balance} USDTd
       </p>
@@ -437,8 +481,12 @@ export default function SendPanel({
       {error ? <p className="errorText">{error}</p> : null}
 
       <div className="actions">
-        <button className="primaryButton" onClick={review} disabled={!selectedSource}>
-          Get route & review
+        <button
+          className="primaryButton"
+          onClick={review}
+          disabled={!selectedSource || !readiness.ready}
+        >
+          {readiness.checking ? "Checking payment…" : "Get route & review"}
         </button>
       </div>
     </section>

@@ -1312,3 +1312,22 @@ code {
     width: 100%;
   }
 }
+
+
+/* v0.12 payment readiness / fee preflight */
+.paymentReadiness { margin-top: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--soft); padding: 16px; }
+.paymentReadinessHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.paymentReadinessHeader .eyebrow { margin-bottom: 5px; }
+.paymentReadinessHeader h3 { margin: 0; font-size: 18px; letter-spacing: -0.025em; }
+.readinessOverall { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); padding: 6px 9px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.readinessOverall-ready { color: #166534; }
+.readinessList { display: grid; gap: 0; margin-top: 14px; border-top: 1px solid var(--line); }
+.readinessRow { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 10px; align-items: start; border-bottom: 1px solid var(--line); padding: 11px 0; }
+.readinessRow > div { display: grid; gap: 3px; }
+.readinessRow strong { font-size: 13px; }
+.readinessRow span:not(.readinessDot) { color: var(--muted); font-size: 12px; }
+.readinessDot { width: 8px; height: 8px; margin-top: 4px; border-radius: 999px; background: var(--muted); opacity: 0.45; }
+.readinessDot-ready { background: #16a34a; opacity: 1; }
+.readinessDot-blocked { background: #be123c; opacity: 1; }
+.readinessDot-checking { background: #ca8a04; opacity: 1; }
+@media (max-width: 560px) { .paymentReadinessHeader { display: grid; } .readinessOverall { justify-self: start; } }

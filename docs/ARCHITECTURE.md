@@ -249,10 +249,10 @@ Read balances for owned and watch-only wallets, aggregate owned balances, and ch
 Keep blockchain mechanics out of the normal product experience while retaining technical detail for advanced users and development. Complete.
 
 ### M10 — Payment requests / QR
-Generate QR/payment links for Receive and scan/open them to populate a PaymentIntent. **Current.**
+Generate QR/payment links for Receive and scan/open them to populate a PaymentIntent. Complete.
 
 ### M11 — Payment readiness / fee preflight
-Check source balance, network-fee readiness, recipient validity, and route readiness before approval.
+Check source balance, network-fee readiness, recipient validity, and route readiness before approval. **Current.**
 
 ### M12 — Router expansion
 Add an alternative route only when we have a concrete route/provider to compare with direct settlement.
@@ -385,3 +385,8 @@ reference/memo (optional)
 A QR code is an input mechanism, never an authorization mechanism. Scanning must never execute a transaction automatically.
 
 v0.11 requests are stateless and encoded in the payment link. This keeps the milestone simple and avoids a database/request lifecycle before there is a concrete business need for persistent invoice-style requests.
+
+
+## v0.12 — Payment readiness / fee preflight
+
+Before a PaymentIntent advances to quote/review, Krypto121 evaluates recipient validity, stablecoin balance, estimated network-fee readiness and direct-route availability. Preflight is read-only and never signs, approves, or sends a transaction.

@@ -53,6 +53,70 @@ export async function readCeloBalance(address: `0x${string}`) {
   };
 }
 
+export type DirectTransferPreflight = {
+  routeAvailable: boolean;
+  networkFeeReady: boolean;
+  estimatedFeeWei?: bigint;
+  requiredFeeWei?: bigint;
+  error?: string;
+};
+
+export async function checkDirectTransferPreflight(input: {
+  sourceWallet: `0x${string}`;
+  recipient: `0x${string}`;
+  amount: string;
+}): Promise<DirectTransferPreflight> {
+  let rawAmount: bigint;
+
+  try {
+    rawAmount = parseUnits(input.amount, CELO_SEPOLIA_TEST_USDT.decimals);
+  } catch {
+    return {
+      routeAvailable: false,
+      networkFeeReady: false,
+      error: "Enter a valid amount",
+    };
+  }
+
+  if (rawAmount <= BigInt(0)) {
+    return {
+      routeAvailable: false,
+      networkFeeReady: false,
+      error: "Amount must be greater than zero",
+    };
+  }
+
+  try {
+    const [gas, gasPrice, nativeBalance] = await Promise.all([
+      publicClient.estimateContractGas({
+        address: CELO_SEPOLIA_TEST_USDT.address,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [input.recipient, rawAmount],
+        account: input.sourceWallet,
+      }),
+      publicClient.getGasPrice(),
+      publicClient.getBalance({ address: input.sourceWallet }),
+    ]);
+
+    const estimatedFeeWei = gas * gasPrice;
+    const requiredFeeWei = (estimatedFeeWei * BigInt(125)) / BigInt(100);
+
+    return {
+      routeAvailable: true,
+      networkFeeReady: nativeBalance >= requiredFeeWei,
+      estimatedFeeWei,
+      requiredFeeWei,
+    };
+  } catch {
+    return {
+      routeAvailable: false,
+      networkFeeReady: false,
+      error: "Could not verify the payment route right now",
+    };
+  }
+}
+
 async function sendContractTransaction(
   wallet: WalletProvider,
   to: `0x${string}`,

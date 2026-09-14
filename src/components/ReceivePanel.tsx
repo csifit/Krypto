@@ -14,7 +14,7 @@ export default function ReceivePanel({ address }: { address: string }) {
   return (
     <section className="receivePanel">
       <div>
-        <p className="eyebrow">Receive test USDT</p>
+        <p className="eyebrow">Receive test funds</p>
         <h2>Your Celo Sepolia address</h2>
         <p className="addressBox">{address}</p>
       </div>
@@ -24,8 +24,7 @@ export default function ReceivePanel({ address }: { address: string }) {
       </button>
 
       <p className="hint">
-        Only use Celo Sepolia test assets here. Do not send real USDT to this
-        development wallet.
+        Development network only. Do not send real USDT to this test flow.
       </p>
     </section>
   );

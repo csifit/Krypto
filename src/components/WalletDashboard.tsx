@@ -3,6 +3,9 @@
 import { useMemo, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import ReceivePanel from "@/components/ReceivePanel";
+import SendPanel from "@/components/SendPanel";
+import TestFundsPanel from "@/components/TestFundsPanel";
+import { useCeloBalance } from "@/hooks/useCeloBalance";
 import { useUsdtBalance } from "@/hooks/useUsdtBalance";
 import { celoSepolia } from "@/lib/celo";
 import { createPrivyWalletProvider } from "@/lib/wallet/privy";
@@ -25,6 +28,7 @@ export default function WalletDashboard() {
   const { ready, authenticated, login, logout, user } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
   const [showReceive, setShowReceive] = useState(false);
+  const [showSend, setShowSend] = useState(false);
 
   const embeddedWallet = wallets.find(
     (wallet) => wallet.walletClientType === "privy",
@@ -32,12 +36,15 @@ export default function WalletDashboard() {
 
   const walletProvider = useMemo(() => {
     if (!embeddedWallet?.address) return undefined;
-    return createPrivyWalletProvider(embeddedWallet.address, celoSepolia.id);
-  }, [embeddedWallet?.address]);
+    return createPrivyWalletProvider(embeddedWallet, celoSepolia.id);
+  }, [embeddedWallet]);
 
-  const { balance, loading, error, refresh } = useUsdtBalance(
-    walletProvider?.address,
-  );
+  const usdt = useUsdtBalance(walletProvider?.address);
+  const celo = useCeloBalance(walletProvider?.address);
+
+  async function refreshAll() {
+    await Promise.all([usdt.refresh(), celo.refresh()]);
+  }
 
   if (!ready || !walletsReady) {
     return (
@@ -57,8 +64,8 @@ export default function WalletDashboard() {
             <p className="eyebrow">Krypto Business</p>
             <h1>Send digital dollars globally.</h1>
             <p className="lead">
-              Start with a user-owned USDT wallet on Celo. No real funds are
-              used in this development build.
+              Start with a user-owned stablecoin wallet on Celo. Development
+              uses test tokens only; production remains USDT-first.
             </p>
             <button className="primaryButton" onClick={login}>
               Create account
@@ -68,15 +75,15 @@ export default function WalletDashboard() {
 
         <section className="grid">
           <article className="panel">
-            <span className="status">V1</span>
+            <span className="status">V1 target</span>
             <h2>USDT</h2>
-            <p>Our first supported stablecoin.</p>
+            <p>Our first production stablecoin.</p>
           </article>
 
           <article className="panel">
             <span className="status">Network</span>
-            <h2>Celo Sepolia</h2>
-            <p>Testnet only while we build the payment flow.</p>
+            <h2>Celo</h2>
+            <p>Celo Sepolia is used while we build the payment flow.</p>
           </article>
 
           <article className="panel">
@@ -93,7 +100,7 @@ export default function WalletDashboard() {
     <main className="shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Krypto Business</p>
+          <p className="eyebrow">Krypto Business · Development</p>
           <h1 className="dashboardTitle">Account</h1>
         </div>
         <button className="secondaryButton" onClick={logout}>
@@ -104,37 +111,64 @@ export default function WalletDashboard() {
       <section className="balanceCard">
         <div className="balanceHeader">
           <div>
-            <p className="balanceLabel">Available balance</p>
+            <p className="balanceLabel">Available test balance</p>
             <p className="balance">
-              {loading ? "…" : `${formatBalance(balance)} USDT`}
+              {usdt.loading ? "…" : `${formatBalance(usdt.balance)} USDTd`}
             </p>
-            <p className="muted">Celo Sepolia testnet</p>
+            <p className="muted">Celo Sepolia · no real-world value</p>
           </div>
-          <button className="textButton" onClick={() => void refresh()}>
+          <button className="textButton" onClick={() => void refreshAll()}>
             Refresh
           </button>
         </div>
 
-        {error ? <p className="errorText">Balance error: {error}</p> : null}
+        {usdt.error ? (
+          <p className="errorText">Balance error: {usdt.error}</p>
+        ) : null}
+        {celo.error ? <p className="errorText">Gas error: {celo.error}</p> : null}
 
         <div className="actions">
-          <button className="primaryButton" disabled>
-            Send
+          <button
+            className="primaryButton"
+            disabled={!walletProvider}
+            onClick={() => {
+              setShowSend((value) => !value);
+              setShowReceive(false);
+            }}
+          >
+            {showSend ? "Hide send" : "Send"}
           </button>
           <button
             className="secondaryButton"
             disabled={!walletProvider}
-            onClick={() => setShowReceive((value) => !value)}
+            onClick={() => {
+              setShowReceive((value) => !value);
+              setShowSend(false);
+            }}
           >
             {showReceive ? "Hide receive" : "Receive"}
           </button>
         </div>
-
-        <p className="hint">Send remains disabled until the next milestone.</p>
       </section>
+
+      {showSend && walletProvider ? (
+        <SendPanel
+          wallet={walletProvider}
+          balance={usdt.balance}
+          onSent={refreshAll}
+        />
+      ) : null}
 
       {showReceive && walletProvider ? (
         <ReceivePanel address={walletProvider.address} />
+      ) : null}
+
+      {walletProvider ? (
+        <TestFundsPanel
+          wallet={walletProvider}
+          celoBalance={celo.balance}
+          onFunded={refreshAll}
+        />
       ) : null}
 
       <section className="grid">
@@ -161,9 +195,9 @@ export default function WalletDashboard() {
         </article>
 
         <article className="panel">
-          <span className="status">Network</span>
-          <h2>Celo Sepolia</h2>
-          <p>Chain ID {celoSepolia.id}</p>
+          <span className="status">Gas</span>
+          <h2>{celo.loading ? "…" : `${Number(celo.balance).toFixed(4)} CELO`}</h2>
+          <p>Celo Sepolia test CELO only.</p>
         </article>
       </section>
     </main>

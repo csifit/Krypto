@@ -23,12 +23,12 @@ Krypto Web App
   |
   +-- Celo RPC
           |
-          +-- USDT token contract
+          +-- stablecoin contract
 ```
 
 ## Wallet abstraction
 
-Krypto application code should depend on a Krypto-owned wallet interface rather than directly on Privy wherever practical.
+Krypto application code depends on a Krypto-owned wallet interface rather than directly on Privy wherever practical.
 
 V1:
 
@@ -44,15 +44,75 @@ Krypto -> WalletProvider -> Krypto MPC infrastructure -> user wallet
 
 Custom MPC is a planned future architecture, not a V1 task. It should only be introduced after the product, transaction flows, recovery model, and security model are mature.
 
+In v0.3 the abstraction exposes:
+
+- wallet address
+- chain switching
+- a standard EIP-1193 signing/transaction provider
+
+This keeps blockchain transaction code independent of Privy's UI-specific hooks.
+
 ## Source of truth
 
 For crypto balances, the blockchain is the source of truth.
 
-Krypto may later cache or annotate blockchain data, but it should not invent a customer's USDT balance independently of Celo.
+Krypto may later cache or annotate blockchain data, but it should not invent a customer's stablecoin balance independently of Celo.
+
+## Test token strategy
+
+Production target:
+
+```text
+USDT on Celo mainnet
+0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e
+```
+
+Development v0.3 uses:
+
+```text
+USDT dummy / USDTd on Celo Sepolia
+0xD2B356E6E231e6fEF586A992e5e820c31673282f
+Decimals: 6
+```
+
+USDTd is publicly mintable test money and has no real-world value.
+
+The development token is intentionally separate from production USDT. Never infer a production token address from the active test token configuration.
+
+## Payment authorization
+
+The transaction path in v0.3 is:
+
+```text
+User enters recipient + amount
+        |
+        v
+Krypto validates
+        |
+        v
+Krypto review screen
+        |
+        v
+User selects Approve & send
+        |
+        v
+WalletProvider requests transaction authorization
+        |
+        v
+Privy user wallet signs / submits
+        |
+        v
+Celo Sepolia confirms
+        |
+        v
+Krypto refreshes blockchain balance
+```
+
+Krypto does not keep a backend signing key.
 
 ## Payment intent
 
-The user should describe the desired outcome rather than manually choosing every technical rail.
+The user should eventually describe the desired outcome rather than manually choosing every technical rail.
 
 Example:
 
@@ -65,10 +125,10 @@ That becomes a `PaymentIntent`.
 
 The routing engine can later return one or more `PaymentQuote` objects. Each quote contains a `PaymentRoute` describing the steps necessary to settle the intent.
 
-For V1, the route is deliberately trivial:
+For the first route, keep it trivial:
 
 ```text
-USDT on Celo -> USDT on Celo
+stablecoin on Celo -> stablecoin on Celo
 ```
 
 Future routes may include:
@@ -86,13 +146,7 @@ Celo Sepolia
 Chain ID: 11142220
 ```
 
-Token:
-
-```text
-Test USDT
-0xd077A400968890Eacc75cdc901F0356c943e4fDb
-Decimals: 6
-```
+The user needs test CELO for gas in v0.3. Gas abstraction is intentionally postponed until the basic signing and transfer flow is proven.
 
 ## e-CNY boundary
 
@@ -118,13 +172,13 @@ A future USDT -> e-CNY route crosses from public blockchain infrastructure into 
 ## Milestones
 
 ### M1 — Account
-Authentication + embedded wallet.
+Authentication + embedded wallet. Complete.
 
 ### M2 — Read / Receive
-Read test-USDT balance and expose the wallet address. **Current.**
+Read balance and expose wallet address. Complete.
 
 ### M3 — Send
-User-authorized test-USDT transfer with explicit confirmation.
+User-authorized test stablecoin transfer with explicit confirmation. **Current.**
 
 ### M4 — Business primitives
 Beneficiaries, payment memo, transaction history, export-friendly records.

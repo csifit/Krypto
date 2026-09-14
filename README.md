@@ -4,7 +4,7 @@ Krypto is a business-first stablecoin payments application.
 
 ## Direction
 
-- USDT first
+- USDT first in production
 - Celo first
 - Non-custodial embedded wallet
 - Business-oriented UX
@@ -13,21 +13,43 @@ Krypto is a business-first stablecoin payments application.
 - Future e-CNY support through an authorized external rail, not as a Celo token
 - Long-term wallet plan: replace Privy with custom Krypto MPC infrastructure behind the same wallet abstraction
 
-## Current milestone — v0.2
+## Current milestone — v0.3
 
-This version implements:
+This version implements the first user-authorized blockchain payment flow.
 
-1. Next.js + TypeScript
-2. Privy authentication
-3. Automatic embedded EVM wallet creation
-4. A `WalletProvider` abstraction so Privy is replaceable later
-5. Celo Sepolia as the development network
-6. Read-only test-USDT balance from the blockchain
-7. Receive panel with the real embedded-wallet address
-8. Celo block-explorer link
-9. Initial `PaymentIntent`, `PaymentQuote`, and `PaymentRoute` domain types
+1. Privy authentication and embedded EVM wallet
+2. Krypto-owned `WalletProvider` abstraction
+3. Celo Sepolia development network
+4. Read wallet gas balance (test CELO)
+5. Read development stablecoin balance
+6. Receive wallet address
+7. Development funding helper
+8. Review screen before sending
+9. User-authorized ERC-20 transfer
+10. Pending / success / failure handling
+11. Blockscout transaction links
 
-It intentionally does **not** send transactions yet.
+## Important test-token distinction
+
+Production remains **real USDT on Celo mainnet**.
+
+For v0.3 we deliberately use a publicly mintable Celo Sepolia development token:
+
+```text
+USDT dummy / USDTd
+0xD2B356E6E231e6fEF586A992e5e820c31673282f
+Decimals: 6
+```
+
+USDTd is test money only and has no economic value. It lets us test the complete wallet-signing and ERC-20 transfer flow without asking developers to obtain real or scarce Tether test tokens.
+
+The official Tether test deployment is retained in code for reference, but v0.3 does not use it for the wallet balance or send flow.
+
+Production USDT on Celo mainnet remains:
+
+```text
+0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e
+```
 
 ## Local setup
 
@@ -36,7 +58,7 @@ npm install
 Copy-Item .env.example .env.local
 ```
 
-Create a Privy application and put its App ID in `.env.local`:
+Create a Privy application and add the App ID to `.env.local`:
 
 ```env
 NEXT_PUBLIC_PRIVY_APP_ID=your_app_id
@@ -55,15 +77,46 @@ Open:
 http://localhost:3000
 ```
 
-## Expected behavior
+## First test payment
 
-1. Click **Create account**.
-2. Authenticate through Privy.
-3. Privy creates an embedded EVM wallet if the user does not already have one.
-4. Krypto shows the real wallet address.
-5. Krypto reads that address's test-USDT balance directly from Celo Sepolia.
-6. **Receive** exposes the address and a copy button.
-7. **Send** remains disabled.
+### 1. Sign in
+
+Open Krypto and authenticate with Privy.
+
+### 2. Copy your wallet address
+
+Use **Receive** or copy the address shown on the dashboard.
+
+### 3. Get test CELO
+
+Open the Celo Sepolia faucet from the **Get test funds** card and request test CELO for your Krypto wallet address.
+
+Test CELO pays testnet transaction gas. It has no real-world value.
+
+Return to Krypto and click **Refresh**.
+
+### 4. Mint development USDT
+
+Once the dashboard shows a positive test CELO balance, click:
+
+```text
+Mint 100 USDTd
+```
+
+Privy should ask you to approve the transaction. After confirmation, Krypto refreshes the balance.
+
+### 5. Send a test payment
+
+You need a second Celo Sepolia-compatible address. It may be another Krypto test account or another EVM wallet configured for Celo Sepolia.
+
+Click **Send**, enter:
+
+- recipient address
+- amount
+
+Krypto shows a review screen. Click **Approve & send**. Privy should ask you to authorize the blockchain transaction.
+
+After confirmation, Krypto shows the transaction hash and a Blockscout link.
 
 ## Development network
 
@@ -72,22 +125,19 @@ Celo Sepolia:
 - Chain ID: `11142220`
 - RPC: `https://forno.celo-sepolia.celo-testnet.org`
 - Explorer: `https://celo-sepolia.blockscout.com`
-- Test USDT: `0xd077A400968890Eacc75cdc901F0356c943e4fDb`
-- USDT decimals: `6`
+- Faucet: `https://faucet.celo.org/celo-sepolia`
 
-Production USDT on Celo mainnet:
+Do not enable mainnet transfers yet.
 
-- `0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e`
+## Next milestone — v0.4
 
-Do not send real assets to the Sepolia wallet or enable production transfers yet.
+After the first test payment is verified:
 
-## Next milestone — v0.3
-
-- Obtain test assets safely
-- Build the first user-authorized test-USDT send
-- Validate recipient and amount
-- Show confirmation screen before signing
-- Show pending / confirmed / failed states
-- Link the completed transaction to Blockscout
+- local transaction history
+- beneficiary / recipient model
+- payment memo
+- explicit `PaymentIntent` creation from the Send flow
+- simple same-chain `PaymentRoute`
+- prepare the router boundary without adding cross-chain complexity yet
 
 See `docs/ARCHITECTURE.md`.

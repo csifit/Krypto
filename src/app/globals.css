@@ -253,3 +253,125 @@ code {
   color: var(--foreground);
   font-size: 14px;
 }
+
+.sendPanel,
+.testFundsPanel {
+  margin-top: 16px;
+}
+
+.sendPanel {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  padding: 24px;
+}
+
+.sendPanel h2,
+.testFundsPanel h2 {
+  margin: 8px 0 14px;
+}
+
+.field {
+  display: block;
+  margin-top: 18px;
+}
+
+.field > span,
+.miniLabel {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.field input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0 14px;
+  color: var(--foreground);
+  font: inherit;
+  outline: none;
+}
+
+.field input:focus {
+  border-color: var(--foreground);
+}
+
+.amountField {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding-right: 14px;
+}
+
+.amountField input {
+  border: 0;
+}
+
+.amountField strong {
+  white-space: nowrap;
+}
+
+.reviewRows {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.reviewRows > div {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+}
+
+.reviewRows span {
+  color: var(--muted);
+}
+
+.reviewRows strong {
+  font-size: 14px;
+}
+
+.buttonLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.fundingStatus {
+  display: flex;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.fundingStatus strong {
+  display: block;
+}
+
+.successText {
+  margin: 18px 0 0;
+  color: #166534;
+}
+
+.inlineLinkNoMargin {
+  margin-top: 0;
+}
+
+@media (max-width: 560px) {
+  .reviewRows > div {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+  }
+}

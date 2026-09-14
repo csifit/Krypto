@@ -1,6 +1,6 @@
 # Krypto121 Architecture
 
-## Product boundary
+## Product boundary  
 
 Krypto121 provides the user experience and payment orchestration without becoming the holder of customer wallet keys.
 

@@ -6,13 +6,12 @@ import { isAddress } from "viem";
 import BeneficiariesPanel from "@/components/BeneficiariesPanel";
 import DashboardSidebar, { type SecondarySection } from "@/components/DashboardSidebar";
 import PaymentHistory from "@/components/PaymentHistory";
-import ReceivePanel from "@/components/ReceivePanel";
+import ReceivePanel, { type ReceiveWalletOption } from "@/components/ReceivePanel";
 import SendPanel from "@/components/SendPanel";
 import TestFundsPanel from "@/components/TestFundsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import WalletsPanel from "@/components/WalletsPanel";
-import { useCeloBalance } from "@/hooks/useCeloBalance";
-import { useUsdtBalance } from "@/hooks/useUsdtBalance";
+import { useWalletPortfolio } from "@/hooks/useWalletPortfolio";
 import { celoSepolia } from "@/lib/celo";
 import {
   createBeneficiary,
@@ -152,8 +151,62 @@ export default function WalletDashboard() {
     return sources;
   }, [embeddedWallet, linkedWallets, wallets]);
 
-  const usdt = useUsdtBalance(walletProvider?.address);
-  const celo = useCeloBalance(walletProvider?.address);
+  const ownedWalletAddresses = useMemo<`0x${string}`[]>(() => {
+    const addresses: `0x${string}`[] = [];
+    if (embeddedWallet?.address) addresses.push(embeddedWallet.address as `0x${string}`);
+    for (const wallet of linkedWallets) addresses.push(wallet.address);
+
+    return addresses.filter(
+      (address, index, all) =>
+        all.findIndex((candidate) => candidate.toLowerCase() === address.toLowerCase()) === index,
+    );
+  }, [embeddedWallet?.address, linkedWallets]);
+
+  const trackedWalletAddresses = useMemo<`0x${string}`[]>(() => {
+    const addresses = [...ownedWalletAddresses, ...watchWallets.map((wallet) => wallet.address)];
+    return addresses.filter(
+      (address, index, all) =>
+        all.findIndex((candidate) => candidate.toLowerCase() === address.toLowerCase()) === index,
+    );
+  }, [ownedWalletAddresses, watchWallets]);
+
+  const portfolio = useWalletPortfolio(trackedWalletAddresses);
+
+  const ownedUsdtTotal = useMemo(() => {
+    return ownedWalletAddresses.reduce((total, address) => {
+      const balance = portfolio.balances[address.toLowerCase()]?.usdt ?? "0";
+      const number = Number(balance);
+      return Number.isFinite(number) ? total + number : total;
+    }, 0);
+  }, [ownedWalletAddresses, portfolio.balances]);
+
+  const embeddedBalance = walletProvider
+    ? portfolio.balances[walletProvider.address.toLowerCase()]
+    : undefined;
+
+  const receiveWallets = useMemo<ReceiveWalletOption[]>(() => {
+    const options: ReceiveWalletOption[] = [];
+
+    if (embeddedWallet?.address) {
+      options.push({
+        id: `embedded-${embeddedWallet.address.toLowerCase()}`,
+        label: "Krypto121 wallet",
+        address: embeddedWallet.address as `0x${string}`,
+        detail: "Embedded wallet · Celo Sepolia",
+      });
+    }
+
+    for (const wallet of linkedWallets) {
+      options.push({
+        id: `linked-${wallet.address.toLowerCase()}`,
+        label: wallet.provider,
+        address: wallet.address,
+        detail: "Linked wallet · Celo Sepolia",
+      });
+    }
+
+    return options;
+  }, [embeddedWallet?.address, linkedWallets]);
 
   useEffect(() => {
     const walletAddress = walletProvider?.address;
@@ -242,7 +295,7 @@ export default function WalletDashboard() {
   }
 
   async function refreshAll() {
-    await Promise.all([usdt.refresh(), celo.refresh()]);
+    await portfolio.refresh();
     setHistoryRefreshKey((value) => value + 1);
   }
 
@@ -355,9 +408,11 @@ export default function WalletDashboard() {
                   </button>
                 </div>
                 <strong className="balanceCompact">
-                  {usdt.loading ? "…" : formatBalance(usdt.balance)}
+                  {portfolio.loading ? "…" : formatBalance(String(ownedUsdtTotal))}
                 </strong>
-                <span className="cardSubtle">USDTd · testnet</span>
+                <span className="cardSubtle">
+                  USDTd · {ownedWalletAddresses.length} owned {ownedWalletAddresses.length === 1 ? "wallet" : "wallets"} · testnet
+                </span>
               </article>
 
               <article className="dashboardCard">
@@ -389,8 +444,6 @@ export default function WalletDashboard() {
             </section>
 
             {backendError ? <p className="errorText">Backend: {backendError}</p> : null}
-            {usdt.error ? <p className="errorText">Balance error: {usdt.error}</p> : null}
-            {celo.error ? <p className="errorText">Gas error: {celo.error}</p> : null}
 
             {showSend && walletProvider ? (
               <SendPanel
@@ -402,7 +455,7 @@ export default function WalletDashboard() {
             ) : null}
 
             {showReceive && walletProvider ? (
-              <ReceivePanel address={walletProvider.address} />
+              <ReceivePanel wallets={receiveWallets} />
             ) : null}
           </div>
 
@@ -419,12 +472,15 @@ export default function WalletDashboard() {
                   embeddedAddress={walletProvider?.address}
                   linkedWallets={linkedWallets}
                   watchWallets={watchWallets}
+                  balances={portfolio.balances}
+                  balancesLoading={portfolio.loading}
                   loading={walletsLoading}
                   linkStatus={walletLinkStatus}
                   onLinkExternal={linkExternalWallet}
                   onConnectExternal={connectExternalWallet}
                   onAddWatch={addWatchWallet}
                   onRemoveWatch={removeWatchWallet}
+                  onRefreshBalances={portfolio.refresh}
                 />
               ) : null}
 
@@ -445,7 +501,7 @@ export default function WalletDashboard() {
                 <div className="developerSideContent">
                   <TestFundsPanel
                     wallet={walletProvider}
-                    celoBalance={celo.balance}
+                    celoBalance={embeddedBalance?.celo ?? "0"}
                     onFunded={refreshAll}
                   />
                   <div className="developerFacts">

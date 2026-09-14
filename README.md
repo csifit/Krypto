@@ -4,46 +4,57 @@
 
 Krypto121 is currently a testnet, business-first stablecoin payments application.
 
-## v0.8 — Choose payment source
+## v0.9 — Wallet portfolio
 
-v0.8 lets a user create a `PaymentIntent` from either:
+v0.9 makes the wallet directory useful as a single place to monitor the user's wallets.
 
-- the Krypto121 embedded wallet; or
-- a linked external EVM wallet that is currently connected and able to sign.
+Krypto121 now reads Celo Sepolia balances for:
 
-Watch-only wallets remain view-only and can never become a payment source.
+- the Krypto121 embedded wallet;
+- verified linked external wallets; and
+- watch-only EVM addresses.
 
-### Payment flow
+The main **Balance** card shows the total USDTd across owned wallets only:
 
 ```text
-Connected source wallet
-        ↓
-PaymentIntent
-        ↓
-Krypto121 route / quote
-        ↓
-User approves in the selected wallet
-        ↓
-Celo Sepolia
-        ↓
-Payment history
+embedded wallet + verified linked wallets
 ```
 
-The router still returns the simple direct Celo test route. The important change is that the source wallet is now part of the payment intent rather than being hard-wired to the embedded wallet.
+Watch-only balances are visible in **My wallets** but are deliberately excluded from the owned total.
+
+## Send / Receive
+
+Send keeps the v0.8 behavior:
+
+```text
+choose connected source wallet
+        ↓
+PaymentIntent.sourceWallet
+        ↓
+route / quote
+        ↓
+selected wallet approves
+```
+
+Receive now lets the user choose which owned wallet address should receive funds. A linked wallet does not need to be connected just to display its receive address.
+
+## Source of truth
+
+Celo Sepolia remains the source of truth for balances and settlement. Portfolio balances are read directly from the chain; they are not stored as authoritative balances in Supabase.
 
 ## What stays unchanged
 
 - Celo Sepolia development network
 - USDTd test token
 - Privy authentication and wallet linking
-- Supabase persistence
+- Supabase persistence for business metadata
 - beneficiaries and payment history
 - PaymentIntent -> Quote -> Route boundary
 - simple dashboard: My wallet, Balance, Send / Receive
 - optional dark mode
 - future Privy -> custom Krypto121 MPC direction
 
-## Upgrade from v0.7
+## Upgrade from v0.8
 
 No database migration and no new environment variables are required.
 
@@ -53,23 +64,17 @@ npm run build
 npm run dev
 ```
 
-## v0.8 acceptance test
+## v0.9 acceptance test
 
 1. Sign in to Krypto121.
 2. Open **My wallets**.
-3. Confirm the embedded Krypto121 wallet is available.
-4. Confirm a previously linked external wallet appears.
-5. If it says it is saved but not connected, click **Connect for payment**.
-6. Make sure the external wallet has some USDTd on Celo Sepolia for testing.
-7. Open **Send**.
-8. Confirm **Pay from** lists the Krypto121 wallet plus connected linked wallets.
-9. Select the external wallet.
-10. Confirm Krypto121 reads that wallet's USDTd balance.
-11. Create a small payment, review the quote, and confirm **Pay from** shows the selected external wallet.
-12. Approve the transaction in that external wallet.
-13. Confirm the transaction settles on Celo Sepolia and appears in Payment history with that external source address.
-14. Repeat with the embedded Krypto121 wallet and confirm the original path still works.
+3. Confirm the embedded wallet shows USDTd and CELO balances.
+4. Confirm linked wallets show their Celo Sepolia USDTd and CELO balances.
+5. Add a watch-only Celo/EVM address and confirm its balances appear.
+6. Confirm watch-only funds do **not** increase the main dashboard Balance total.
+7. Confirm verified linked-wallet USDTd **does** contribute to the main dashboard Balance total.
+8. Click **Receive** and confirm you can choose between the embedded wallet and linked wallets.
+9. Copy a linked wallet's receive address and verify it is correct.
+10. Send a small payment from a connected linked wallet and confirm the source-wallet balance and total owned balance refresh after settlement.
 
-Watch-only wallets must never appear in **Pay from**.
-
-See `docs/ARCHITECTURE.md` and `docs/upgrades/UPGRADE-v0.8.md`.
+See `docs/ARCHITECTURE.md` and `docs/upgrades/UPGRADE-v0.9.md`.

@@ -77,7 +77,7 @@ Watch-only
 
 Linked-wallet identity is persisted by Privy as part of the user account. Watch-only addresses are stored by Krypto121 in `watch_wallets`. Krypto121 must never ask a user to provide a seed phrase or raw private key to add a wallet.
 
-The current payment source remains the embedded Krypto121 wallet. A later milestone may let the user select a connected linked wallet as the source of a PaymentIntent.
+Connected verified linked wallets may be selected as PaymentIntent sources. Watch-only wallets remain view-only and are never signing sources.
 
 ## Source of truth
 
@@ -237,21 +237,24 @@ Beneficiaries, memo, payment intents, quote, and direct route. Complete.
 Privy-authenticated Krypto121 API + Supabase persistence for profile, beneficiaries, and settled payment records. Complete.
 
 ### M6 — Wallet directory
-Multiple linked wallets plus watch-only wallets. **Current.**
+Multiple linked wallets plus watch-only wallets. Complete.
 
 ### M7 — Select payment source
-Allow a connected linked wallet to become the source wallet for a PaymentIntent.
+Allow a connected linked wallet to become the source wallet for a PaymentIntent. Complete.
 
-### M8 — Router expansion
+### M8 — Wallet portfolio
+Read balances for owned and watch-only wallets, aggregate owned balances, and choose a receive wallet. **Current.**
+
+### M9 — Router expansion
 Add additional crypto routes only when we have a concrete need/provider.
 
-### M9 — Gas UX
+### M10 — Gas UX
 Hide native-token complexity using the safest supported Celo mechanism.
 
-### M10 — External settlement rails
+### M11 — External settlement rails
 Off-ramp / FX / CBDC integrations through regulated providers.
 
-### M11 — Mainnet preparation
+### M12 — Mainnet preparation
 Security review, monitoring, production RPC, compliance boundaries, and mainnet guardrails.
 
 ## Principle
@@ -295,3 +298,22 @@ Settlement
 ```
 
 This keeps the routing layer independent of the wallet provider and preserves the future migration from Privy to custom Krypto121 MPC infrastructure.
+
+## v0.9 — Wallet portfolio
+
+Krypto121 now treats the wallet directory as a portfolio view rather than only an address list.
+
+```text
+Krypto121 account
+  |
+  +-- embedded wallet -------- balance read from Celo
+  +-- linked wallet ---------- balance read from Celo
+  +-- linked wallet ---------- balance read from Celo
+  +-- watch-only wallet ------ balance read from Celo, view only
+```
+
+The main dashboard's owned USDTd total includes only the embedded wallet and ownership-verified linked wallets. Watch-only addresses are deliberately excluded because adding a watch-only address does not prove ownership.
+
+Receive destinations follow the same ownership rule: embedded and verified linked wallets may be selected as receive addresses; watch-only addresses are not presented as owned receive destinations.
+
+Portfolio values are display data derived from the blockchain. They are never authoritative settlement records and are not persisted as balances in Supabase.

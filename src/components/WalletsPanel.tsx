@@ -2,32 +2,73 @@
 
 import { useMemo, useState } from "react";
 import { isAddress } from "viem";
+import type { WalletBalanceSnapshot } from "@/hooks/useWalletPortfolio";
 import type { LinkedWalletView, WatchWallet } from "@/lib/wallet/directory";
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
+function formatBalance(value: string) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return value;
+  return number.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  });
+}
+
+function BalanceLines({
+  address,
+  balances,
+}: {
+  address: `0x${string}`;
+  balances: Record<string, WalletBalanceSnapshot>;
+}) {
+  const snapshot = balances[address.toLowerCase()];
+
+  if (!snapshot) {
+    return <span className="walletBalanceMuted">Balance loading…</span>;
+  }
+
+  if (snapshot.error) {
+    return <span className="walletBalanceMuted">Balance unavailable</span>;
+  }
+
+  return (
+    <div className="walletBalanceLines">
+      <span><strong>{formatBalance(snapshot.usdt)}</strong> USDTd</span>
+      <span><strong>{formatBalance(snapshot.celo)}</strong> CELO</span>
+    </div>
+  );
+}
+
 export default function WalletsPanel({
   embeddedAddress,
   linkedWallets,
   watchWallets,
+  balances,
+  balancesLoading,
   loading,
   linkStatus,
   onLinkExternal,
   onAddWatch,
   onRemoveWatch,
   onConnectExternal,
+  onRefreshBalances,
 }: {
   embeddedAddress?: `0x${string}`;
   linkedWallets: LinkedWalletView[];
   watchWallets: WatchWallet[];
+  balances: Record<string, WalletBalanceSnapshot>;
+  balancesLoading: boolean;
   loading: boolean;
   linkStatus?: string | null;
   onLinkExternal(): void;
   onAddWatch(label: string, address: `0x${string}`): Promise<void>;
   onRemoveWatch(id: string): Promise<void>;
   onConnectExternal(): void;
+  onRefreshBalances(): Promise<void>;
 }) {
   const [showWatchForm, setShowWatchForm] = useState(false);
   const [label, setLabel] = useState("");
@@ -80,15 +121,22 @@ export default function WalletsPanel({
 
   return (
     <section className="walletDirectory">
-      <div className="panelHeadingCompact">
+      <div className="walletDirectoryHeader">
         <div>
           <p className="eyebrow">Wallet directory</p>
           <h2>My wallets</h2>
         </div>
+        <button
+          className="textButton"
+          onClick={() => void onRefreshBalances()}
+          disabled={balancesLoading}
+        >
+          {balancesLoading ? "Refreshing…" : "Refresh balances"}
+        </button>
       </div>
 
       <p className="muted walletDirectoryIntro">
-        Link wallets you control or save an address as watch-only. Krypto121 never asks for a seed phrase or private key.
+        Link wallets you control or save an address as watch-only. Krypto121 reads Celo Sepolia balances without taking custody.
       </p>
 
       <div className="walletDirectoryActions">
@@ -155,6 +203,7 @@ export default function WalletsPanel({
                 <span className="walletBadge">Active</span>
               </div>
               <span className="walletListAddress">{shortAddress(embeddedAddress)}</span>
+              <BalanceLines address={embeddedAddress} balances={balances} />
             </div>
             <div className="walletListMeta">
               <span>Embedded</span>
@@ -171,6 +220,7 @@ export default function WalletsPanel({
                 <span className="walletBadge">Linked</span>
               </div>
               <span className="walletListAddress">{shortAddress(wallet.address)}</span>
+              <BalanceLines address={wallet.address} balances={balances} />
             </div>
             <div className="walletListMeta">
               <span>Ownership verified</span>
@@ -193,9 +243,10 @@ export default function WalletsPanel({
                 <span className="walletBadge walletBadgeQuiet">Watch-only</span>
               </div>
               <span className="walletListAddress">{shortAddress(wallet.address)}</span>
+              <BalanceLines address={wallet.address} balances={balances} />
             </div>
             <div className="walletListMeta">
-              <span>View only</span>
+              <span>View only · excluded from owned total</span>
               <button
                 className="textButton"
                 onClick={() => void onRemoveWatch(wallet.id)}
@@ -214,7 +265,7 @@ export default function WalletsPanel({
       </div>
 
       <p className="walletDirectoryNote">
-        Linked wallets can authorize transactions when connected. Watch-only wallets can never sign or move funds.
+        Owned balance totals include the embedded wallet and verified linked wallets. Watch-only wallets are monitored separately and can never sign or move funds.
       </p>
     </section>
   );

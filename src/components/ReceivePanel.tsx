@@ -1,31 +1,96 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-export default function ReceivePanel({ address }: { address: string }) {
+export type ReceiveWalletOption = {
+  id: string;
+  label: string;
+  address: `0x${string}`;
+  detail?: string;
+};
+
+function shortAddress(address: string) {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+export default function ReceivePanel({
+  wallets,
+}: {
+  wallets: ReceiveWalletOption[];
+}) {
+  const [selectedId, setSelectedId] = useState(wallets[0]?.id ?? "");
   const [copied, setCopied] = useState(false);
 
+  const selected = useMemo(
+    () => wallets.find((wallet) => wallet.id === selectedId) ?? wallets[0],
+    [selectedId, wallets],
+  );
+
+  useEffect(() => {
+    if (!selected && wallets[0]) {
+      setSelectedId(wallets[0].id);
+    }
+  }, [selected, wallets]);
+
   async function copyAddress() {
-    await navigator.clipboard.writeText(address);
+    if (!selected) return;
+    await navigator.clipboard.writeText(selected.address);
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
+    window.setTimeout(() => setCopied(false), 1400);
+  }
+
+  if (!selected) {
+    return (
+      <section className="receivePanel">
+        <h2>Receive</h2>
+        <p className="muted">No owned wallet is available.</p>
+      </section>
+    );
   }
 
   return (
     <section className="receivePanel">
-      <div>
-        <p className="eyebrow">Receive test funds</p>
-        <h2>Your Celo Sepolia address</h2>
-        <p className="addressBox">{address}</p>
-      </div>
+      <p className="eyebrow">Receive funds</p>
+      <h2>Receive USDTd</h2>
 
-      <button className="secondaryButton" onClick={copyAddress}>
-        {copied ? "Copied" : "Copy address"}
-      </button>
+      {wallets.length > 1 ? (
+        <label className="field">
+          <span>Receive into</span>
+          <select
+            value={selected.id}
+            onChange={(event) => {
+              setSelectedId(event.target.value);
+              setCopied(false);
+            }}
+          >
+            {wallets.map((wallet) => (
+              <option key={wallet.id} value={wallet.id}>
+                {wallet.label} · {shortAddress(wallet.address)}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       <p className="hint">
-        Development network only. Do not send real USDT to this test flow.
+        {selected.detail ?? "Celo Sepolia"}. Send only test assets compatible with this development network.
       </p>
+
+      <p className="addressBox">{selected.address}</p>
+
+      <div className="actions">
+        <button className="primaryButton" onClick={() => void copyAddress()}>
+          {copied ? "Copied" : "Copy address"}
+        </button>
+        <a
+          className="secondaryButton buttonLink"
+          href={`https://celo-sepolia.blockscout.com/address/${selected.address}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open explorer
+        </a>
+      </div>
     </section>
   );
 }

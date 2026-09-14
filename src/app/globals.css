@@ -1073,3 +1073,43 @@ code {
     align-items: flex-start;
   }
 }
+
+/* v0.9 wallet portfolio */
+.walletDirectoryHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.walletBalanceLines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.walletBalanceLines strong {
+  color: var(--foreground);
+  font-size: 13px;
+}
+
+.walletBalanceMuted {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .walletDirectoryHeader {
+    display: block;
+  }
+
+  .walletDirectoryHeader > .textButton {
+    margin-top: 8px;
+    padding-left: 0;
+  }
+}

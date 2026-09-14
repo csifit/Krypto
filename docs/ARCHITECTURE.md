@@ -42,61 +42,33 @@ Long-term target:
 Krypto -> WalletProvider -> Krypto MPC infrastructure -> user wallet
 ```
 
-Custom MPC is a planned future architecture, not a V1 task. It should only be introduced after the product, transaction flows, recovery model, and security model are mature.
-
-In v0.3 the abstraction exposes:
-
-- wallet address
-- chain switching
-- a standard EIP-1193 signing/transaction provider
-
-This keeps blockchain transaction code independent of Privy's UI-specific hooks.
+Custom MPC remains a planned future architecture. It should only be introduced after the product, transaction flows, recovery model, and security model are mature.
 
 ## Source of truth
 
-For crypto balances, the blockchain is the source of truth.
+For crypto balances and actual settlement, the blockchain is the source of truth.
 
-Krypto may later cache or annotate blockchain data, but it should not invent a customer's stablecoin balance independently of Celo.
+Krypto may store business metadata such as beneficiaries, memos, intents, quotes, and user-friendly transaction records. Those records must not invent a token balance independently of Celo.
 
-## Test token strategy
-
-Production target:
+## v0.4 payment flow
 
 ```text
-USDT on Celo mainnet
-0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e
-```
-
-Development v0.3 uses:
-
-```text
-USDT dummy / USDTd on Celo Sepolia
-0xD2B356E6E231e6fEF586A992e5e820c31673282f
-Decimals: 6
-```
-
-USDTd is publicly mintable test money and has no real-world value.
-
-The development token is intentionally separate from production USDT. Never infer a production token address from the active test token configuration.
-
-## Payment authorization
-
-The transaction path in v0.3 is:
-
-```text
-User enters recipient + amount
+User enters recipient + amount + optional memo
         |
         v
-Krypto validates
+Krypto creates PaymentIntent
         |
         v
-Krypto review screen
+Krypto router creates PaymentQuote
         |
         v
-User selects Approve & send
+Quote contains PaymentRoute
         |
         v
-WalletProvider requests transaction authorization
+User reviews route + fees
+        |
+        v
+WalletProvider requests authorization
         |
         v
 Privy user wallet signs / submits
@@ -105,54 +77,84 @@ Privy user wallet signs / submits
 Celo Sepolia confirms
         |
         v
-Krypto refreshes blockchain balance
+Krypto stores a local settlement record
 ```
 
-Krypto does not keep a backend signing key.
+The current route contains one step:
+
+```text
+transfer
+provider: Celo
+description: Direct USDTd transfer on Celo Sepolia
+```
+
+This establishes the router boundary without adding unnecessary cross-chain infrastructure.
 
 ## Payment intent
 
-The user should eventually describe the desired outcome rather than manually choosing every technical rail.
+A `PaymentIntent` describes the desired outcome, not the technical execution path.
 
-Example:
+Current example:
+
+```text
+Send 10 USDTd from wallet A
+to wallet B
+memo: Invoice TEST-001
+```
+
+Future example:
 
 ```text
 Spend up to 7,050 USDT
 so Supplier ABC receives exactly 50,000 e-CNY.
 ```
 
-That becomes a `PaymentIntent`.
+The routing engine can later compare multiple `PaymentQuote` objects with different `PaymentRoute` steps.
 
-The routing engine can later return one or more `PaymentQuote` objects. Each quote contains a `PaymentRoute` describing the steps necessary to settle the intent.
-
-For the first route, keep it trivial:
-
-```text
-stablecoin on Celo -> stablecoin on Celo
-```
-
-Future routes may include:
+Future route steps may include:
 
 ```text
 swap -> bridge -> offramp -> FX -> CBDC payout
 ```
 
-## Network
+## Local business records in v0.4
+
+v0.4 stores the following locally, scoped by wallet address:
+
+- beneficiaries
+- payment memo
+- payment intent
+- selected quote/route
+- settled transaction hash
+
+This is temporary product-development storage, not the final Krypto ledger or backend.
+
+The next backend milestone should make these records durable and tenant-scoped while preserving the blockchain as the settlement source of truth.
+
+## Test token strategy
 
 Development:
 
 ```text
-Celo Sepolia
-Chain ID: 11142220
+USDT dummy / USDTd on Celo Sepolia
+0xD2B356E6E231e6fEF586A992e5e820c31673282f
+Decimals: 6
 ```
 
-The user needs test CELO for gas in v0.3. Gas abstraction is intentionally postponed until the basic signing and transfer flow is proven.
+Production target:
+
+```text
+USDT on Celo mainnet
+0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e
+```
+
+Never infer production token configuration from the development token.
 
 ## e-CNY boundary
 
 Do not model e-CNY as an ERC-20 token.
 
-A future asset model may distinguish:
+A future asset model distinguishes:
 
 ```text
 crypto:
@@ -178,26 +180,29 @@ Authentication + embedded wallet. Complete.
 Read balance and expose wallet address. Complete.
 
 ### M3 — Send
-User-authorized test stablecoin transfer with explicit confirmation. **Current.**
+User-authorized test stablecoin transfer. Complete.
 
-### M4 — Business primitives
-Beneficiaries, payment memo, transaction history, export-friendly records.
+### M4 — Business primitives + router boundary
+Beneficiaries, memo, local history, explicit payment intents, quote, and direct route. **Current.**
 
-### M5 — Router prototype
-Payment intents, quotes, route selection, initially for simple on-chain routes.
+### M5 — Durable backend
+Business profile, tenant ownership, beneficiaries, payment intents, quotes, and settlement records stored server-side.
 
-### M6 — Gas UX
+### M6 — Router expansion
+Add additional crypto routes only when we have a concrete need/provider.
+
+### M7 — Gas UX
 Hide native-token complexity using the safest supported Celo mechanism.
 
-### M7 — External settlement rails
+### M8 — External settlement rails
 Off-ramp / FX / CBDC integrations through regulated providers.
 
-### M8 — Mainnet preparation
+### M9 — Mainnet preparation
 Security review, monitoring, production RPC, compliance boundaries, and mainnet guardrails.
 
 ## Principle
 
 > Krypto is the interface and orchestration layer.  
 > The user controls the wallet.  
-> The blockchain records the stablecoin balance.  
+> The blockchain records stablecoin ownership and settlement.  
 > The router decides how a payment should settle.

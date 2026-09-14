@@ -13,27 +13,62 @@ Krypto is a business-first stablecoin payments application.
 - Future e-CNY support through an authorized external rail, not as a Celo token
 - Long-term wallet plan: replace Privy with custom Krypto MPC infrastructure behind the same wallet abstraction
 
-## Current milestone — v0.3
+## Current milestone — v0.4
 
-This version implements the first user-authorized blockchain payment flow.
+v0.4 turns the working Celo transfer into Krypto's first routed payment flow.
+
+Implemented:
 
 1. Privy authentication and embedded EVM wallet
 2. Krypto-owned `WalletProvider` abstraction
-3. Celo Sepolia development network
-4. Read wallet gas balance (test CELO)
-5. Read development stablecoin balance
-6. Receive wallet address
-7. Development funding helper
-8. Review screen before sending
-9. User-authorized ERC-20 transfer
-10. Pending / success / failure handling
-11. Blockscout transaction links
+3. Celo Sepolia + development USDTd
+4. Receive and user-authorized Send
+5. `PaymentIntent` creation from the Send flow
+6. A first `PaymentQuote`
+7. A first `PaymentRoute`: direct USDTd transfer on Celo Sepolia
+8. Optional payment memo
+9. Local beneficiary/address book
+10. Local payment history with transaction links
+11. Krypto fee explicitly shown as `0.00` in development
 
-## Important test-token distinction
+## Why the router exists already
 
-Production remains **real USDT on Celo mainnet**.
+The first route is intentionally boring:
 
-For v0.3 we deliberately use a publicly mintable Celo Sepolia development token:
+```text
+USDTd on Celo Sepolia
+        ->
+USDTd on Celo Sepolia
+```
+
+But the UI now asks Krypto for a route before the wallet signs. Later the route may become:
+
+```text
+USDT -> swap -> bridge -> off-ramp -> FX -> e-CNY payout
+```
+
+without changing the basic user action:
+
+```text
+Create payment intent -> receive quote -> approve -> settle
+```
+
+## Temporary local business data
+
+Beneficiaries, memos, and Krypto's payment-history annotations are currently stored in browser `localStorage` under the active wallet address.
+
+This is deliberate for v0.4 so we can validate the business workflow without introducing a database yet.
+
+Important:
+
+- local records are not portable across browsers/devices;
+- deleting browser storage deletes those annotations;
+- the blockchain remains the source of truth for actual token balances and transfers;
+- a later milestone will move business records to Krypto's backend/database.
+
+## Development token
+
+v0.4 continues to use the publicly mintable Celo Sepolia development token:
 
 ```text
 USDT dummy / USDTd
@@ -41,9 +76,7 @@ USDT dummy / USDTd
 Decimals: 6
 ```
 
-USDTd is test money only and has no economic value. It lets us test the complete wallet-signing and ERC-20 transfer flow without asking developers to obtain real or scarce Tether test tokens.
-
-The official Tether test deployment is retained in code for reference, but v0.3 does not use it for the wallet balance or send flow.
+It has no real-world value.
 
 Production USDT on Celo mainnet remains:
 
@@ -51,93 +84,52 @@ Production USDT on Celo mainnet remains:
 0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e
 ```
 
+Do not enable mainnet transfers yet.
+
 ## Local setup
 
 ```powershell
 npm install
-Copy-Item .env.example .env.local
-```
-
-Create a Privy application and add the App ID to `.env.local`:
-
-```env
-NEXT_PUBLIC_PRIVY_APP_ID=your_app_id
-NEXT_PUBLIC_KRYPTO_NETWORK=testnet
-```
-
-Then:
-
-```powershell
+npm run build
 npm run dev
 ```
 
-Open:
+Existing `.env.local` continues to be used:
 
-```text
-http://localhost:3000
+```env
+NEXT_PUBLIC_PRIVY_APP_ID=your_app_id
+NEXT_PUBLIC_PRIVY_CLIENT_ID=your_client_id
+NEXT_PUBLIC_KRYPTO_NETWORK=testnet
 ```
 
-## First test payment
+## v0.4 acceptance test
 
-### 1. Sign in
+1. Sign in to Krypto.
+2. Add the second test wallet as a beneficiary, for example `Test Supplier`.
+3. Click **Send**.
+4. Select the beneficiary.
+5. Enter `1 USDTd`.
+6. Add memo `Invoice TEST-001`.
+7. Click **Get route & review**.
+8. Confirm the review shows:
+   - Direct USDTd transfer on Celo Sepolia
+   - Krypto fee `0.00 USDTd`
+   - network fee paid in test CELO
+   - memo
+9. Approve the transfer with Privy.
+10. Confirm the transaction succeeds on Blockscout.
+11. Confirm it appears under **Payment history**.
 
-Open Krypto and authenticate with Privy.
+## Next milestone — v0.5
 
-### 2. Copy your wallet address
+Once v0.4 is verified, the next logical step is a small Krypto backend/database for durable business records:
 
-Use **Receive** or copy the address shown on the dashboard.
+- business profile
+- beneficiaries
+- payment intents / quotes / settlement records
+- cross-device transaction history
+- tenant ownership/security
 
-### 3. Get test CELO
-
-Open the Celo Sepolia faucet from the **Get test funds** card and request test CELO for your Krypto wallet address.
-
-Test CELO pays testnet transaction gas. It has no real-world value.
-
-Return to Krypto and click **Refresh**.
-
-### 4. Mint development USDT
-
-Once the dashboard shows a positive test CELO balance, click:
-
-```text
-Mint 100 USDTd
-```
-
-Privy should ask you to approve the transaction. After confirmation, Krypto refreshes the balance.
-
-### 5. Send a test payment
-
-You need a second Celo Sepolia-compatible address. It may be another Krypto test account or another EVM wallet configured for Celo Sepolia.
-
-Click **Send**, enter:
-
-- recipient address
-- amount
-
-Krypto shows a review screen. Click **Approve & send**. Privy should ask you to authorize the blockchain transaction.
-
-After confirmation, Krypto shows the transaction hash and a Blockscout link.
-
-## Development network
-
-Celo Sepolia:
-
-- Chain ID: `11142220`
-- RPC: `https://forno.celo-sepolia.celo-testnet.org`
-- Explorer: `https://celo-sepolia.blockscout.com`
-- Faucet: `https://faucet.celo.org/celo-sepolia`
-
-Do not enable mainnet transfers yet.
-
-## Next milestone — v0.4
-
-After the first test payment is verified:
-
-- local transaction history
-- beneficiary / recipient model
-- payment memo
-- explicit `PaymentIntent` creation from the Send flow
-- simple same-chain `PaymentRoute`
-- prepare the router boundary without adding cross-chain complexity yet
+The blockchain will remain the source of truth for token ownership and transfers.
 
 See `docs/ARCHITECTURE.md`.

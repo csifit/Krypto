@@ -2,12 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+import BeneficiariesPanel from "@/components/BeneficiariesPanel";
+import PaymentHistory from "@/components/PaymentHistory";
 import ReceivePanel from "@/components/ReceivePanel";
 import SendPanel from "@/components/SendPanel";
 import TestFundsPanel from "@/components/TestFundsPanel";
 import { useCeloBalance } from "@/hooks/useCeloBalance";
 import { useUsdtBalance } from "@/hooks/useUsdtBalance";
 import { celoSepolia } from "@/lib/celo";
+import type { Beneficiary } from "@/lib/payments/types";
 import { createPrivyWalletProvider } from "@/lib/wallet/privy";
 
 function shortAddress(address?: string) {
@@ -29,6 +32,8 @@ export default function WalletDashboard() {
   const { wallets, ready: walletsReady } = useWallets();
   const [showReceive, setShowReceive] = useState(false);
   const [showSend, setShowSend] = useState(false);
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const embeddedWallet = wallets.find(
     (wallet) => wallet.walletClientType === "privy",
@@ -44,6 +49,7 @@ export default function WalletDashboard() {
 
   async function refreshAll() {
     await Promise.all([usdt.refresh(), celo.refresh()]);
+    setHistoryRefreshKey((value) => value + 1);
   }
 
   if (!ready || !walletsReady) {
@@ -87,9 +93,9 @@ export default function WalletDashboard() {
           </article>
 
           <article className="panel">
-            <span className="status">Custody</span>
-            <h2>User controlled</h2>
-            <p>Krypto does not need to hold the user&apos;s private key.</p>
+            <span className="status">Router</span>
+            <h2>Payment intents</h2>
+            <p>Krypto chooses the settlement route; the user authorizes it.</p>
           </article>
         </section>
       </main>
@@ -155,6 +161,7 @@ export default function WalletDashboard() {
         <SendPanel
           wallet={walletProvider}
           balance={usdt.balance}
+          beneficiaries={beneficiaries}
           onSent={refreshAll}
         />
       ) : null}
@@ -195,11 +202,24 @@ export default function WalletDashboard() {
         </article>
 
         <article className="panel">
-          <span className="status">Gas</span>
-          <h2>{celo.loading ? "…" : `${Number(celo.balance).toFixed(4)} CELO`}</h2>
-          <p>Celo Sepolia test CELO only.</p>
+          <span className="status">Router</span>
+          <h2>Direct Celo</h2>
+          <p>One route enabled. Krypto fee is 0 for development.</p>
         </article>
       </section>
+
+      {walletProvider ? (
+        <>
+          <BeneficiariesPanel
+            walletAddress={walletProvider.address}
+            onChange={setBeneficiaries}
+          />
+          <PaymentHistory
+            walletAddress={walletProvider.address}
+            refreshKey={historyRefreshKey}
+          />
+        </>
+      ) : null}
     </main>
   );
 }

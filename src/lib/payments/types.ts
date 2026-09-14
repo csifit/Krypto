@@ -23,12 +23,14 @@ export type PaymentAsset = CryptoAsset | FiatAsset | CbdcAsset;
 
 export interface PaymentIntent {
   id: string;
+  createdAt: string;
   sourceWallet: `0x${string}`;
   sourceAsset: PaymentAsset;
   destinationAsset: PaymentAsset;
   destination: string;
+  sourceAmount: string;
   destinationAmount?: string;
-  maximumSourceAmount?: string;
+  memo?: string;
   status: "draft" | "quoted" | "approved" | "executing" | "settled" | "failed";
 }
 
@@ -41,17 +43,37 @@ export interface RouteStep {
 
 export interface PaymentRoute {
   id: string;
+  kind: "direct-celo" | "future-router";
   steps: RouteStep[];
-  estimatedFee: string;
+  kryptoFeeAmount: string;
+  networkFeeDescription: string;
   estimatedDurationSeconds?: number;
 }
 
 export interface PaymentQuote {
   id: string;
+  createdAt: string;
   paymentIntentId: string;
   sourceAmount: string;
   destinationAmount: string;
   feeAmount: string;
   expiresAt: string;
   route: PaymentRoute;
+}
+
+export interface Beneficiary {
+  id: string;
+  name: string;
+  address: `0x${string}`;
+  createdAt: string;
+}
+
+export interface LocalPaymentRecord {
+  id: string;
+  intent: PaymentIntent;
+  quote: PaymentQuote;
+  txHash: `0x${string}`;
+  status: "settled";
+  settledAt: string;
+  beneficiaryName?: string;
 }

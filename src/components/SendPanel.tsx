@@ -3,24 +3,43 @@
 import { useMemo, useState } from "react";
 import { isAddress } from "viem";
 import { sendTestUsdt } from "@/lib/blockchain/usdt";
+import {
+  createDirectCeloIntent,
+  quoteDirectCeloIntent,
+} from "@/lib/payments/directCelo";
+import { addPaymentRecord } from "@/lib/payments/localStore";
+import type {
+  Beneficiary,
+  PaymentIntent,
+  PaymentQuote,
+} from "@/lib/payments/types";
 import type { WalletProvider } from "@/lib/wallet/types";
 
 export default function SendPanel({
   wallet,
   balance,
+  beneficiaries,
   onSent,
 }: {
   wallet: WalletProvider;
   balance: string;
+  beneficiaries: Beneficiary[];
   onSent(): Promise<void>;
 }) {
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
+  const [intent, setIntent] = useState<PaymentIntent | null>(null);
+  const [quote, setQuote] = useState<PaymentQuote | null>(null);
   const [stage, setStage] = useState<"form" | "review" | "sending" | "success">(
     "form",
   );
   const [error, setError] = useState<string | null>(null);
-  const [hash, setHash] = useState<string | null>(null);
+  const [hash, setHash] = useState<`0x${string}` | null>(null);
+
+  const selectedBeneficiary = beneficiaries.find(
+    (item) => item.address.toLowerCase() === recipient.toLowerCase(),
+  );
 
   const validationError = useMemo(() => {
     if (!recipient || !amount) return null;
@@ -34,6 +53,11 @@ export default function SendPanel({
     return null;
   }, [recipient, amount, balance]);
 
+  function selectBeneficiary(value: string) {
+    if (!value) return;
+    setRecipient(value);
+  }
+
   function review() {
     setError(null);
 
@@ -46,19 +70,55 @@ export default function SendPanel({
       return;
     }
 
-    setStage("review");
+    try {
+      const nextIntent = createDirectCeloIntent({
+        sourceWallet: wallet.address,
+        destination: recipient,
+        amount,
+        memo,
+      });
+      nextIntent.status = "quoted";
+      const nextQuote = quoteDirectCeloIntent(nextIntent);
+      setIntent(nextIntent);
+      setQuote(nextQuote);
+      setStage("review");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create payment quote");
+    }
   }
 
   async function confirm() {
+    if (!intent || !quote) return;
+
+    if (new Date(quote.expiresAt).getTime() <= Date.now()) {
+      setError("This quote expired. Review the payment again.");
+      setStage("form");
+      return;
+    }
+
     setStage("sending");
     setError(null);
 
     try {
-      const txHash = await sendTestUsdt(wallet, recipient, amount);
+      intent.status = "executing";
+      const txHash = await sendTestUsdt(wallet, intent.destination, intent.sourceAmount);
+      intent.status = "settled";
+
+      addPaymentRecord(wallet.address, {
+        id: intent.id,
+        intent,
+        quote,
+        txHash,
+        status: "settled",
+        settledAt: new Date().toISOString(),
+        beneficiaryName: selectedBeneficiary?.name,
+      });
+
       setHash(txHash);
       setStage("success");
       await onSent();
     } catch (err) {
+      intent.status = "failed";
       setStage("review");
       setError(err instanceof Error ? err.message : "Could not send test USDT");
     }
@@ -67,19 +127,24 @@ export default function SendPanel({
   function reset() {
     setRecipient("");
     setAmount("");
+    setMemo("");
+    setIntent(null);
+    setQuote(null);
     setError(null);
     setHash(null);
     setStage("form");
   }
 
-  if (stage === "success" && hash) {
+  if (stage === "success" && hash && intent) {
     return (
       <section className="sendPanel">
-        <span className="status">Confirmed</span>
+        <span className="status">Settled</span>
         <h2>Test payment sent</h2>
         <p>
-          {amount} USDTd was confirmed on Celo Sepolia. No real money was used.
+          {intent.sourceAmount} USDTd was confirmed on Celo Sepolia through the
+          direct Krypto route. No real money was used.
         </p>
+        {intent.memo ? <p className="hint">Memo: {intent.memo}</p> : null}
         <p className="addressBox">{hash}</p>
         <div className="actions">
           <a
@@ -98,30 +163,42 @@ export default function SendPanel({
     );
   }
 
-  if (stage === "review" || stage === "sending") {
+  if ((stage === "review" || stage === "sending") && intent && quote) {
     return (
       <section className="sendPanel">
-        <p className="eyebrow">Review test payment</p>
-        <h2>{amount} USDTd</h2>
+        <p className="eyebrow">Payment intent quoted</p>
+        <h2>{quote.destinationAmount} USDTd</h2>
 
         <div className="reviewRows">
           <div>
             <span>Recipient</span>
-            <strong className="breakWord">{recipient}</strong>
+            <strong className="breakWord">
+              {selectedBeneficiary?.name ?? intent.destination}
+            </strong>
           </div>
           <div>
-            <span>Network</span>
-            <strong>Celo Sepolia</strong>
+            <span>Route</span>
+            <strong>{quote.route.steps[0]?.description}</strong>
           </div>
           <div>
-            <span>Asset</span>
-            <strong>USDTd · development only</strong>
+            <span>Krypto fee</span>
+            <strong>{quote.route.kryptoFeeAmount} USDTd</strong>
           </div>
+          <div>
+            <span>Network fee</span>
+            <strong>{quote.route.networkFeeDescription}</strong>
+          </div>
+          {intent.memo ? (
+            <div>
+              <span>Memo</span>
+              <strong>{intent.memo}</strong>
+            </div>
+          ) : null}
         </div>
 
         <p className="hint">
-          Confirming will ask your Privy wallet to authorize the blockchain
-          transaction.
+          This is Krypto&apos;s first route: a direct same-chain transfer. Future
+          quotes can replace it with swap, bridge, off-ramp, FX, or CBDC steps.
         </p>
 
         {error ? <p className="errorText">{error}</p> : null}
@@ -148,8 +225,22 @@ export default function SendPanel({
 
   return (
     <section className="sendPanel">
-      <p className="eyebrow">Send test USDT</p>
+      <p className="eyebrow">Create payment intent</p>
       <h2>New payment</h2>
+
+      {beneficiaries.length ? (
+        <label className="field">
+          <span>Saved beneficiary</span>
+          <select value="" onChange={(event) => selectBeneficiary(event.target.value)}>
+            <option value="">Choose beneficiary…</option>
+            {beneficiaries.map((beneficiary) => (
+              <option key={beneficiary.id} value={beneficiary.address}>
+                {beneficiary.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       <label className="field">
         <span>Recipient wallet address</span>
@@ -174,13 +265,23 @@ export default function SendPanel({
         </div>
       </label>
 
+      <label className="field">
+        <span>Memo (optional)</span>
+        <input
+          value={memo}
+          onChange={(event) => setMemo(event.target.value)}
+          maxLength={120}
+          placeholder="Invoice 1042"
+        />
+      </label>
+
       <p className="hint">Available: {balance} USDTd</p>
       {validationError ? <p className="errorText">{validationError}</p> : null}
       {error ? <p className="errorText">{error}</p> : null}
 
       <div className="actions">
         <button className="primaryButton" onClick={review}>
-          Review payment
+          Get route & review
         </button>
       </div>
     </section>

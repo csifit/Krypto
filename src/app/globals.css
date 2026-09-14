@@ -375,3 +375,89 @@ code {
     flex-wrap: wrap;
   }
 }
+
+.businessPanel {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  padding: 24px;
+}
+
+.businessPanel h2 {
+  margin: 8px 0 10px;
+}
+
+.twoFields {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+  gap: 12px;
+}
+
+.field select {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0 14px;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.beneficiaryList,
+.historyList {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.beneficiaryRow,
+.historyRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+}
+
+.beneficiaryRow strong,
+.beneficiaryRow span,
+.historyRow strong,
+.historyRow span {
+  display: block;
+}
+
+.beneficiaryRow span,
+.historyRow span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.historyMeta {
+  min-width: 190px;
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .twoFields {
+    grid-template-columns: 1fr;
+  }
+
+  .beneficiaryRow,
+  .historyRow {
+    display: block;
+  }
+
+  .beneficiaryRow .textButton {
+    margin-top: 10px;
+  }
+
+  .historyMeta {
+    margin-top: 10px;
+    min-width: 0;
+    text-align: left;
+  }
+}

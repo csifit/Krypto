@@ -243,18 +243,21 @@ Multiple linked wallets plus watch-only wallets. Complete.
 Allow a connected linked wallet to become the source wallet for a PaymentIntent. Complete.
 
 ### M8 — Wallet portfolio
-Read balances for owned and watch-only wallets, aggregate owned balances, and choose a receive wallet. **Current.**
+Read balances for owned and watch-only wallets, aggregate owned balances, and choose a receive wallet. Complete.
 
-### M9 — Router expansion
+### M9 — Blockchain abstraction UX
+Keep blockchain mechanics out of the normal product experience while retaining technical detail for advanced users and development. **Current.**
+
+### M10 — Router expansion
 Add additional crypto routes only when we have a concrete need/provider.
 
-### M10 — Gas UX
+### M11 — Gas UX
 Hide native-token complexity using the safest supported Celo mechanism.
 
-### M11 — External settlement rails
+### M12 — External settlement rails
 Off-ramp / FX / CBDC integrations through regulated providers.
 
-### M12 — Mainnet preparation
+### M13 — Mainnet preparation
 Security review, monitoring, production RPC, compliance boundaries, and mainnet guardrails.
 
 ## Principle
@@ -317,3 +320,29 @@ The main dashboard's owned USDTd total includes only the embedded wallet and own
 Receive destinations follow the same ownership rule: embedded and verified linked wallets may be selected as receive addresses; watch-only addresses are not presented as owned receive destinations.
 
 Portfolio values are display data derived from the blockchain. They are never authoritative settlement records and are not persisted as balances in Supabase.
+
+
+## v0.10 — Blockchain abstraction UX
+
+Krypto121 deliberately separates the user-facing payment model from the underlying blockchain implementation.
+
+```text
+Normal Krypto121 UX
+  |
+  +-- stablecoin balance
+  +-- wallet
+  +-- send / receive
+  +-- network fee status
+  +-- payment status
+
+Technical details
+  |
+  +-- Celo Sepolia
+  +-- native gas token balance
+  +-- transaction hash
+  +-- blockchain explorer
+```
+
+The normal wallet directory does not need to teach users what CELO is. For an owned wallet it may display a simple network-fee readiness state derived from the native-token balance. Watch-only wallets do not receive this status because they cannot authorize transactions.
+
+This does not change the settlement implementation. Celo remains the development blockchain, and the source wallet still pays the underlying transaction fee. True gas abstraction is a later milestone.

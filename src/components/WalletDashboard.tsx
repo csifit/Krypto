@@ -192,7 +192,7 @@ export default function WalletDashboard() {
         id: `embedded-${embeddedWallet.address.toLowerCase()}`,
         label: "Krypto121 wallet",
         address: embeddedWallet.address as `0x${string}`,
-        detail: "Embedded wallet · Celo Sepolia",
+        detail: "Krypto121 wallet",
       });
     }
 
@@ -201,7 +201,7 @@ export default function WalletDashboard() {
         id: `linked-${wallet.address.toLowerCase()}`,
         label: wallet.provider,
         address: wallet.address,
-        detail: "Linked wallet · Celo Sepolia",
+        detail: "Linked wallet",
       });
     }
 
@@ -387,16 +387,6 @@ export default function WalletDashboard() {
                   <button className="textButton" onClick={() => void copyWallet()} disabled={!walletProvider}>
                     {copied ? "Copied" : "Copy address"}
                   </button>
-                  {walletProvider ? (
-                    <a
-                      className="textLink"
-                      href={`https://celo-sepolia.blockscout.com/address/${walletProvider.address}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Explorer
-                    </a>
-                  ) : null}
                 </div>
               </article>
 
@@ -516,6 +506,17 @@ export default function WalletDashboard() {
                     <div>
                       <span>Route</span>
                       <strong>Direct Celo</strong>
+                    </div>
+                    <div>
+                      <span>Wallet explorer</span>
+                      <a
+                        className="textLink"
+                        href={`https://celo-sepolia.blockscout.com/address/${walletProvider.address}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open technical view
+                      </a>
                     </div>
                   </div>
                 </div>

@@ -52,14 +52,14 @@ export function quoteDirectCeloIntent(intent: PaymentIntent): PaymentQuote {
     id: makeId("route"),
     kind: "direct-celo",
     kryptoFeeAmount: "0.00",
-    networkFeeDescription: "Paid in test CELO",
+    networkFeeDescription: "Paid by the source wallet",
     estimatedDurationSeconds: 15,
     steps: [
       {
         id: makeId("step"),
         type: "transfer",
         provider: "Celo",
-        description: "Direct USDTd transfer on Celo Sepolia",
+        description: "Direct stablecoin transfer",
       },
     ],
   };

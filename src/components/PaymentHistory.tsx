@@ -44,7 +44,7 @@ export default function PaymentHistory({ refreshKey }: { refreshKey: number }) {
       <p className="eyebrow">Krypto121 records</p>
       <h2>Payment history</h2>
       <p className="muted">
-        Krypto121 stores the business record. The blockchain remains the source of truth for settlement.
+        Krypto121 stores the business record. Technical settlement details remain available when needed.
       </p>
 
       {loading ? <p className="hint">Loading payments…</p> : null}
@@ -70,14 +70,21 @@ export default function PaymentHistory({ refreshKey }: { refreshKey: number }) {
               <div className="historyMeta">
                 <span>Settled</span>
                 <span>{new Date(record.settledAt).toLocaleString()}</span>
-                <a
-                  className="inlineLink inlineLinkNoMargin"
-                  href={`https://celo-sepolia.blockscout.com/tx/${record.txHash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View transaction
-                </a>
+                <details className="historyTechnicalDetails">
+                  <summary>Technical details</summary>
+                  <div className="historyTechnicalBody">
+                    <span>Network: Celo Sepolia</span>
+                    <span>Transaction: {shortAddress(record.txHash)}</span>
+                    <a
+                      className="inlineLink inlineLinkNoMargin"
+                      href={`https://celo-sepolia.blockscout.com/tx/${record.txHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View on blockchain
+                    </a>
+                  </div>
+                </details>
               </div>
             </article>
           ))}

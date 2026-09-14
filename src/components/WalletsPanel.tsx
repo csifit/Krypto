@@ -21,9 +21,11 @@ function formatBalance(value: string) {
 function BalanceLines({
   address,
   balances,
+  showNetworkFeeStatus = true,
 }: {
   address: `0x${string}`;
   balances: Record<string, WalletBalanceSnapshot>;
+  showNetworkFeeStatus?: boolean;
 }) {
   const snapshot = balances[address.toLowerCase()];
 
@@ -35,10 +37,16 @@ function BalanceLines({
     return <span className="walletBalanceMuted">Balance unavailable</span>;
   }
 
+  const hasNetworkFeeBalance = Number(snapshot.celo) > 0;
+
   return (
     <div className="walletBalanceLines">
       <span><strong>{formatBalance(snapshot.usdt)}</strong> USDTd</span>
-      <span><strong>{formatBalance(snapshot.celo)}</strong> CELO</span>
+      {showNetworkFeeStatus ? (
+        <span>
+          Network fees · <strong>{hasNetworkFeeBalance ? "Ready" : "Needs funds"}</strong>
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -136,7 +144,7 @@ export default function WalletsPanel({
       </div>
 
       <p className="muted walletDirectoryIntro">
-        Link wallets you control or save an address as watch-only. Krypto121 reads Celo Sepolia balances without taking custody.
+        Link wallets you control or save an address as watch-only. Krypto121 reads wallet balances without taking custody.
       </p>
 
       <div className="walletDirectoryActions">
@@ -243,7 +251,7 @@ export default function WalletsPanel({
                 <span className="walletBadge walletBadgeQuiet">Watch-only</span>
               </div>
               <span className="walletListAddress">{shortAddress(wallet.address)}</span>
-              <BalanceLines address={wallet.address} balances={balances} />
+              <BalanceLines address={wallet.address} balances={balances} showNetworkFeeStatus={false} />
             </div>
             <div className="walletListMeta">
               <span>View only · excluded from owned total</span>

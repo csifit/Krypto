@@ -73,7 +73,7 @@ export default function ReceivePanel({
       ) : null}
 
       <p className="hint">
-        {selected.detail ?? "Celo Sepolia"}. Send only test assets compatible with this development network.
+        {selected.detail ?? "Owned wallet"}. Send only USDTd compatible with this development environment.
       </p>
 
       <p className="addressBox">{selected.address}</p>
@@ -82,14 +82,6 @@ export default function ReceivePanel({
         <button className="primaryButton" onClick={() => void copyAddress()}>
           {copied ? "Copied" : "Copy address"}
         </button>
-        <a
-          className="secondaryButton buttonLink"
-          href={`https://celo-sepolia.blockscout.com/address/${selected.address}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open explorer
-        </a>
       </div>
     </section>
   );

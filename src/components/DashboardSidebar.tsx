@@ -72,7 +72,7 @@ export default function DashboardSidebar({
           <ThemeToggle />
           <div className="sidebarAccount">
             <span>{email ?? "Signed in"}</span>
-            <small>Celo Sepolia · Development</small>
+            <small>Test environment</small>
           </div>
           <button className="sidebarSignOut" onClick={onLogout}>
             Sign out

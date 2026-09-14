@@ -1113,3 +1113,61 @@ code {
     padding-left: 0;
   }
 }
+
+
+/* v0.10 blockchain abstraction */
+.technicalDetails,
+.historyTechnicalDetails {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.technicalDetails summary,
+.historyTechnicalDetails summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.technicalDetailsBody,
+.historyTechnicalBody {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.technicalDetailsBody > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 13px;
+}
+
+.technicalDetailsBody span,
+.historyTechnicalBody span {
+  color: var(--muted);
+}
+
+.technicalDetailsBody strong {
+  font-size: 13px;
+}
+
+.historyTechnicalBody {
+  justify-items: end;
+  font-size: 12px;
+}
+
+@media (max-width: 700px) {
+  .historyTechnicalBody {
+    justify-items: start;
+  }
+}
+
+@media (max-width: 560px) {
+  .technicalDetailsBody > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}

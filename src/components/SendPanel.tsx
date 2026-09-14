@@ -59,7 +59,7 @@ export default function SendPanel({
 
   const validationError = useMemo(() => {
     if (!recipient || !amount) return null;
-    if (!isAddress(recipient)) return "Enter a valid Celo/EVM wallet address";
+    if (!isAddress(recipient)) return "Enter a valid wallet address";
 
     const number = Number(amount);
     if (!Number.isFinite(number) || number <= 0) {
@@ -199,24 +199,36 @@ export default function SendPanel({
         <span className="status">Settled</span>
         <h2>Test payment sent</h2>
         <p>
-          {intent.sourceAmount} USDTd was confirmed on Celo Sepolia through the
-          direct Krypto121 route. No real money was used.
+          {intent.sourceAmount} USDTd was confirmed through Krypto121&apos;s direct
+          test route. No real money was used.
         </p>
         <p className="hint">
           From: {intentSource?.label ?? shortAddress(intent.sourceWallet)}
         </p>
         {intent.memo ? <p className="hint">Memo: {intent.memo}</p> : null}
         {recordWarning ? <p className="errorText">{recordWarning}</p> : null}
-        <p className="addressBox">{hash}</p>
+        <details className="technicalDetails">
+          <summary>Technical details</summary>
+          <div className="technicalDetailsBody">
+            <div>
+              <span>Network</span>
+              <strong>Celo Sepolia</strong>
+            </div>
+            <div>
+              <span>Transaction ID</span>
+              <strong className="breakWord">{hash}</strong>
+            </div>
+            <a
+              className="inlineLink"
+              href={`https://celo-sepolia.blockscout.com/tx/${hash}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View on blockchain
+            </a>
+          </div>
+        </details>
         <div className="actions">
-          <a
-            className="secondaryButton buttonLink"
-            href={`https://celo-sepolia.blockscout.com/tx/${hash}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open transaction
-          </a>
           <button className="primaryButton" onClick={reset}>
             Send another
           </button>

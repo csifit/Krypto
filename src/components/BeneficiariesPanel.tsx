@@ -1,93 +1,68 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { isAddress } from "viem";
-import {
-  loadBeneficiaries,
-  saveBeneficiaries,
-} from "@/lib/payments/localStore";
 import type { Beneficiary } from "@/lib/payments/types";
 
-function makeId() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 export default function BeneficiariesPanel({
-  walletAddress,
-  onChange,
+  beneficiaries,
+  loading,
+  onAdd,
+  onRemove,
 }: {
-  walletAddress: `0x${string}`;
-  onChange?(beneficiaries: Beneficiary[]): void;
+  beneficiaries: Beneficiary[];
+  loading?: boolean;
+  onAdd(name: string, address: `0x${string}`): Promise<void>;
+  onRemove(id: string): Promise<void>;
 }) {
-  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const stored = loadBeneficiaries(walletAddress);
-    setBeneficiaries(stored);
-    onChange?.(stored);
-  }, [walletAddress, onChange]);
-
-  function persist(next: Beneficiary[]) {
-    setBeneficiaries(next);
-    saveBeneficiaries(walletAddress, next);
-    onChange?.(next);
-  }
-
-  function add() {
+  async function add() {
     setError(null);
     const cleanName = name.trim();
     const cleanAddress = address.trim();
 
-    if (!cleanName) {
-      setError("Enter a beneficiary name");
-      return;
-    }
+    if (!cleanName) return setError("Enter a beneficiary name");
     if (!isAddress(cleanAddress)) {
-      setError("Enter a valid Celo/EVM wallet address");
-      return;
-    }
-    if (
-      beneficiaries.some(
-        (item) => item.address.toLowerCase() === cleanAddress.toLowerCase(),
-      )
-    ) {
-      setError("This wallet is already saved");
-      return;
+      return setError("Enter a valid Celo/EVM wallet address");
     }
 
-    const next: Beneficiary[] = [
-      ...beneficiaries,
-      {
-        id: makeId(),
-        name: cleanName,
-        address: cleanAddress as `0x${string}`,
-        createdAt: new Date().toISOString(),
-      },
-    ];
-
-    persist(next);
-    setName("");
-    setAddress("");
+    setSaving(true);
+    try {
+      await onAdd(cleanName, cleanAddress as `0x${string}`);
+      setName("");
+      setAddress("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save beneficiary");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function remove(id: string) {
-    persist(beneficiaries.filter((item) => item.id !== id));
+  async function remove(id: string) {
+    setError(null);
+    setSaving(true);
+    try {
+      await onRemove(id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove beneficiary");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <section className="businessPanel">
-      <p className="eyebrow">Business primitives</p>
+      <p className="eyebrow">Business</p>
       <h2>Beneficiaries</h2>
-      <p className="muted">
-        Saved locally in this browser for now. Backend sync comes in the next data milestone.
-      </p>
+      <p className="muted">Saved securely to your Krypto account.</p>
 
-      {beneficiaries.length ? (
+      {loading ? (
+        <p className="hint">Loading beneficiaries…</p>
+      ) : beneficiaries.length ? (
         <div className="beneficiaryList">
           {beneficiaries.map((beneficiary) => (
             <div className="beneficiaryRow" key={beneficiary.id}>
@@ -95,7 +70,11 @@ export default function BeneficiariesPanel({
                 <strong>{beneficiary.name}</strong>
                 <span>{beneficiary.address}</span>
               </div>
-              <button className="textButton" onClick={() => remove(beneficiary.id)}>
+              <button
+                className="textButton"
+                onClick={() => void remove(beneficiary.id)}
+                disabled={saving}
+              >
                 Remove
               </button>
             </div>
@@ -128,8 +107,8 @@ export default function BeneficiariesPanel({
       {error ? <p className="errorText">{error}</p> : null}
 
       <div className="actions">
-        <button className="secondaryButton" onClick={add}>
-          Add beneficiary
+        <button className="secondaryButton" onClick={() => void add()} disabled={saving}>
+          {saving ? "Saving…" : "Add beneficiary"}
         </button>
       </div>
     </section>

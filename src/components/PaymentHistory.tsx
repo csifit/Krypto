@@ -1,38 +1,60 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadPaymentHistory } from "@/lib/payments/localStore";
+import { usePrivy } from "@privy-io/react-auth";
+import { listPayments } from "@/lib/backend/client";
 import type { LocalPaymentRecord } from "@/lib/payments/types";
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-export default function PaymentHistory({
-  walletAddress,
-  refreshKey,
-}: {
-  walletAddress: `0x${string}`;
-  refreshKey: number;
-}) {
+export default function PaymentHistory({ refreshKey }: { refreshKey: number }) {
+  const { getAccessToken } = usePrivy();
   const [records, setRecords] = useState<LocalPaymentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setRecords(loadPaymentHistory(walletAddress));
-  }, [walletAddress, refreshKey]);
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const next = await listPayments(getAccessToken);
+        if (!cancelled) setRecords(next);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load payment history");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [getAccessToken, refreshKey]);
 
   return (
     <section className="businessPanel">
-      <p className="eyebrow">Local records</p>
+      <p className="eyebrow">Krypto records</p>
       <h2>Payment history</h2>
       <p className="muted">
-        These records are browser-local annotations. The blockchain remains the
-        source of truth for the actual transfer.
+        Krypto stores the business record. The blockchain remains the source of truth for settlement.
       </p>
 
-      {records.length === 0 ? (
-        <p className="hint">No locally recorded payments yet.</p>
-      ) : (
+      {loading ? <p className="hint">Loading payments…</p> : null}
+      {error ? <p className="errorText">{error}</p> : null}
+
+      {!loading && !error && records.length === 0 ? (
+        <p className="hint">No recorded payments yet.</p>
+      ) : null}
+
+      {records.length ? (
         <div className="historyList">
           {records.map((record) => (
             <article className="historyRow" key={record.id}>
@@ -60,7 +82,7 @@ export default function PaymentHistory({
             </article>
           ))}
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

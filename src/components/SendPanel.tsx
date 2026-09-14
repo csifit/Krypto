@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePrivy } from "@privy-io/react-auth";
 import { isAddress } from "viem";
 import { sendTestUsdt } from "@/lib/blockchain/usdt";
 import {
   createDirectCeloIntent,
   quoteDirectCeloIntent,
 } from "@/lib/payments/directCelo";
-import { addPaymentRecord } from "@/lib/payments/localStore";
+import { savePaymentRecord } from "@/lib/backend/client";
 import type {
   Beneficiary,
   PaymentIntent,
@@ -36,6 +37,8 @@ export default function SendPanel({
   );
   const [error, setError] = useState<string | null>(null);
   const [hash, setHash] = useState<`0x${string}` | null>(null);
+  const [recordWarning, setRecordWarning] = useState<string | null>(null);
+  const { getAccessToken } = usePrivy();
 
   const selectedBeneficiary = beneficiaries.find(
     (item) => item.address.toLowerCase() === recipient.toLowerCase(),
@@ -104,15 +107,25 @@ export default function SendPanel({
       const txHash = await sendTestUsdt(wallet, intent.destination, intent.sourceAmount);
       intent.status = "settled";
 
-      addPaymentRecord(wallet.address, {
+      const record = {
         id: intent.id,
         intent,
         quote,
         txHash,
-        status: "settled",
+        status: "settled" as const,
         settledAt: new Date().toISOString(),
         beneficiaryName: selectedBeneficiary?.name,
-      });
+      };
+
+      try {
+        await savePaymentRecord(getAccessToken, wallet.address, record);
+      } catch (syncError) {
+        setRecordWarning(
+          syncError instanceof Error
+            ? `Payment settled, but history sync failed: ${syncError.message}`
+            : "Payment settled, but history sync failed.",
+        );
+      }
 
       setHash(txHash);
       setStage("success");
@@ -132,6 +145,7 @@ export default function SendPanel({
     setQuote(null);
     setError(null);
     setHash(null);
+    setRecordWarning(null);
     setStage("form");
   }
 
@@ -145,6 +159,7 @@ export default function SendPanel({
           direct Krypto route. No real money was used.
         </p>
         {intent.memo ? <p className="hint">Memo: {intent.memo}</p> : null}
+        {recordWarning ? <p className="errorText">{recordWarning}</p> : null}
         <p className="addressBox">{hash}</p>
         <div className="actions">
           <a

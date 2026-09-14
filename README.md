@@ -2,56 +2,77 @@
 
 Krypto is a business-first stablecoin payments application.
 
-## Current direction
+## v0.6
 
-- USDT first
-- Celo first
-- Non-custodial embedded wallet
-- Business-oriented UX
-- Payment-intent and routing architecture
-- Privy in V1 behind a replaceable wallet-provider boundary
-- Custom Krypto MPC infrastructure remains the long-term wallet direction
+v0.6 adds the first durable Krypto backend while keeping the tested wallet and payment flow unchanged.
 
-## v0.5
+### What persists now
 
-v0.5 keeps the tested payment flow intact and simplifies the interface.
+- Krypto profile -> Privy user ID + current embedded wallet address
+- beneficiaries
+- payment intent / quote / route metadata
+- settled transaction hash and memo
 
-The dashboard intentionally shows only three primary cards:
+### What does **not** move into the database
 
-1. My wallet
-2. Balance
-3. Send / Receive
+The blockchain remains the source of truth for:
 
-Secondary functions live in the sidebar / side-card:
+- USDT / USDTd ownership
+- token balance
+- actual settlement
 
-- Beneficiaries
-- Payment history
-- Developer tools
-- Account / theme controls
+Supabase stores business metadata, not a fabricated crypto ledger.
 
-On mobile, the sidebar is hidden behind a hamburger menu.
+## Authentication boundary
 
-The landing page states the Krypto advantage directly:
+The browser authenticates with Privy. Every Krypto API request sends the short-lived Privy access token to the Next.js backend. The backend verifies that token with Privy before touching Supabase.
 
-- user controls funds
-- Krypto finds the payment route
-- costs are reviewed before approval
+The browser does **not** receive a Supabase secret key and does not directly query the three v0.6 tables.
 
-## Development
+## Setup
+
+### 1. Apply the database migration
+
+Open the Supabase project SQL Editor and run:
+
+```text
+supabase/migrations/202609140001_krypto_persistence.sql
+```
+
+Project URL:
+
+```text
+https://yueskxkbwlanxcqntpsi.supabase.co
+```
+
+### 2. Environment variables
+
+Keep the existing variables and add:
+
+```env
+PRIVY_APP_SECRET=...
+SUPABASE_URL=https://yueskxkbwlanxcqntpsi.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_...
+```
+
+`PRIVY_APP_SECRET` and `SUPABASE_SECRET_KEY` are server secrets. Never prefix them with `NEXT_PUBLIC_`.
+
+### 3. Install / build
 
 ```bash
 npm install
+npm run build
 npm run dev
 ```
 
-Build check:
+## Acceptance test
 
-```bash
-npm run build
-```
+1. Sign in to Krypto.
+2. Add a beneficiary.
+3. Refresh the browser: beneficiary should remain.
+4. Sign into the same account in another browser/device: beneficiary should appear there too.
+5. Send a test USDTd payment.
+6. Open Payment history: payment should appear.
+7. Refresh or use another browser: payment should remain.
 
-## Test network
-
-Celo Sepolia only. Test USDTd and test CELO have no real-world value.
-
-See `docs/ARCHITECTURE.md` for the product architecture.
+See `docs/ARCHITECTURE.md` and `UPGRADE-v0.6.md`.

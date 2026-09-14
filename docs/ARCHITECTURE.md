@@ -117,19 +117,31 @@ Future route steps may include:
 swap -> bridge -> offramp -> FX -> CBDC payout
 ```
 
-## Local business records in v0.4
+## Durable business records in v0.6
 
-v0.4 stores the following locally, scoped by wallet address:
+Privy remains the identity provider. Krypto verifies the Privy access token in server-side Next.js API routes, then uses a server-only Supabase secret key.
 
-- beneficiaries
-- payment memo
-- payment intent
-- selected quote/route
-- settled transaction hash
+```text
+Browser
+  |
+  | Privy access token
+  v
+Krypto Next.js API
+  |
+  | verifies token with Privy
+  v
+Privy user ID
+  |
+  v
+Supabase (server-only access)
+  +-- profiles
+  +-- beneficiaries
+  +-- payments
+```
 
-This is temporary product-development storage, not the final Krypto ledger or backend.
+Direct browser access to these tables is intentionally denied. RLS is enabled as defense in depth, while the Krypto API performs the Privy-user authorization check.
 
-The next backend milestone should make these records durable and tenant-scoped while preserving the blockchain as the settlement source of truth.
+The database stores business metadata only. Celo remains authoritative for balances and settlement.
 
 ## Test token strategy
 
@@ -183,10 +195,10 @@ Read balance and expose wallet address. Complete.
 User-authorized test stablecoin transfer. Complete.
 
 ### M4 — Business primitives + router boundary
-Beneficiaries, memo, local history, explicit payment intents, quote, and direct route. **Current.**
+Beneficiaries, memo, payment intents, quote, and direct route. Complete.
 
 ### M5 — Durable backend
-Business profile, tenant ownership, beneficiaries, payment intents, quotes, and settlement records stored server-side.
+Privy-authenticated Krypto API + Supabase persistence for profile, beneficiaries, and settled payment records. **Current.**
 
 ### M6 — Router expansion
 Add additional crypto routes only when we have a concrete need/provider.

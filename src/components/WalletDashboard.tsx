@@ -12,7 +12,12 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { useCeloBalance } from "@/hooks/useCeloBalance";
 import { useUsdtBalance } from "@/hooks/useUsdtBalance";
 import { celoSepolia } from "@/lib/celo";
-import { loadBeneficiaries } from "@/lib/payments/localStore";
+import {
+  createBeneficiary,
+  deleteBeneficiary,
+  listBeneficiaries,
+  syncProfile,
+} from "@/lib/backend/client";
 import type { Beneficiary } from "@/lib/payments/types";
 import { createPrivyWalletProvider } from "@/lib/wallet/privy";
 
@@ -31,13 +36,15 @@ function formatBalance(value: string) {
 }
 
 export default function WalletDashboard() {
-  const { ready, authenticated, login, logout, user } = usePrivy();
+  const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
   const [showReceive, setShowReceive] = useState(false);
   const [showSend, setShowSend] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SecondarySection>(null);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [beneficiariesLoading, setBeneficiariesLoading] = useState(false);
+  const [backendError, setBackendError] = useState<string | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [copied, setCopied] = useState(false);
 
@@ -54,12 +61,63 @@ export default function WalletDashboard() {
   const celo = useCeloBalance(walletProvider?.address);
 
   useEffect(() => {
-    if (!walletProvider?.address) {
+    const walletAddress = walletProvider?.address;
+
+    if (!walletAddress) {
       setBeneficiaries([]);
       return;
     }
-    setBeneficiaries(loadBeneficiaries(walletProvider.address));
-  }, [walletProvider?.address]);
+
+    let cancelled = false;
+
+    async function loadBackend(address: `0x${string}`) {
+      setBeneficiariesLoading(true);
+      setBackendError(null);
+
+      try {
+        await syncProfile(getAccessToken, address);
+
+        const next = await listBeneficiaries(getAccessToken);
+
+        if (!cancelled) {
+          setBeneficiaries(next);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBackendError(
+            error instanceof Error
+              ? error.message
+              : "Could not connect to Krypto backend",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setBeneficiariesLoading(false);
+        }
+      }
+    }
+
+    void loadBackend(walletAddress);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getAccessToken, walletProvider?.address]);
+
+  async function addBeneficiary(name: string, address: `0x${string}`) {
+    if (!walletProvider) return;
+    const created = await createBeneficiary(getAccessToken, {
+      name,
+      address,
+      walletAddress: walletProvider.address,
+    });
+    setBeneficiaries((current) => [...current, created]);
+  }
+
+  async function removeBeneficiary(id: string) {
+    await deleteBeneficiary(getAccessToken, id);
+    setBeneficiaries((current) => current.filter((item) => item.id !== id));
+  }
 
   async function refreshAll() {
     await Promise.all([usdt.refresh(), celo.refresh()]);
@@ -208,6 +266,7 @@ export default function WalletDashboard() {
               </article>
             </section>
 
+            {backendError ? <p className="errorText">Backend: {backendError}</p> : null}
             {usdt.error ? <p className="errorText">Balance error: {usdt.error}</p> : null}
             {celo.error ? <p className="errorText">Gas error: {celo.error}</p> : null}
 
@@ -235,16 +294,15 @@ export default function WalletDashboard() {
 
               {activeSection === "beneficiaries" && walletProvider ? (
                 <BeneficiariesPanel
-                  walletAddress={walletProvider.address}
-                  onChange={setBeneficiaries}
+                  beneficiaries={beneficiaries}
+                  loading={beneficiariesLoading}
+                  onAdd={addBeneficiary}
+                  onRemove={removeBeneficiary}
                 />
               ) : null}
 
               {activeSection === "history" && walletProvider ? (
-                <PaymentHistory
-                  walletAddress={walletProvider.address}
-                  refreshKey={historyRefreshKey}
-                />
+                <PaymentHistory refreshKey={historyRefreshKey} />
               ) : null}
 
               {activeSection === "developer" && walletProvider ? (

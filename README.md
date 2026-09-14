@@ -4,53 +4,66 @@
 
 Krypto121 is currently a testnet, business-first stablecoin payments application.
 
-## v0.10 — Blockchain abstraction UX
+## v0.11 — Payment requests, QR and payment links
 
-v0.10 applies a simple product rule:
+v0.11 adds two complementary payment flows:
 
-> Show payment concepts first. Show blockchain mechanics only when they are useful.
+```text
+Receive
+  -> choose owned wallet
+  -> optional amount + reference
+  -> create QR + shareable payment link
+```
 
-The normal Krypto121 experience now avoids exposing Celo/Blockscout details unnecessarily.
+and:
 
-### Main UX changes
+```text
+Send
+  -> scan QR or open payment link
+  -> PaymentIntent fields are populated
+  -> Krypto121 route/quote
+  -> user reviews
+  -> user approves
+```
 
-- **My wallet** keeps the address and Copy action, but the explorer link moves out of the main card.
-- **My wallets** shows USDTd plus a simple **Network fees · Ready / Needs funds** status instead of the raw CELO amount for owned wallets.
-- Watch-only wallets show the monitored USDTd balance without implying that they can pay network fees.
-- **Receive** no longer exposes the network name or an explorer link in the normal flow.
-- **Send review** uses plain-language route and network-fee descriptions.
-- Successful payments and Payment history keep blockchain information inside **Technical details**.
-- **Developer / test tools** still expose Celo Sepolia and a wallet explorer link for testing.
+### Receive / request payment
 
-## Important boundary
+The Receive panel can now create:
 
-This is a UX abstraction only.
+- a reusable QR when no amount is entered;
+- a specific payment request when amount/reference are entered;
+- a shareable `/pay` link;
+- a QR encoding the same payment link.
 
-Krypto121 still uses:
+A payer who opens the link sees the payment request before signing in. After login/account creation, Krypto121 opens Send with recipient, amount and reference already populated.
 
-- Celo Sepolia for development settlement;
-- USDTd as the test stablecoin;
-- CELO underneath for network transaction fees;
-- Privy for wallet authorization;
-- Supabase for durable business metadata.
+### Scan to pay
 
-v0.10 does **not** sponsor gas or remove the underlying CELO requirement yet. True gas abstraction remains a later milestone.
+Send now includes **Scan QR**. The scanner supports:
 
-## What stays unchanged
+- Krypto121 payment request QR codes;
+- raw EVM wallet-address QR codes;
+- simple `ethereum:` wallet URIs;
+- pasted Krypto121 payment links or wallet addresses as a fallback.
 
-- wallet linking and watch-only wallets
-- portfolio balance aggregation
-- selectable PaymentIntent source wallet
-- selectable Receive wallet
-- beneficiaries
-- payment history
-- direct Celo test route
-- non-custodial wallet model
-- future Privy -> custom Krypto121 MPC direction
+Camera scanning uses `@zxing/browser`. QR generation uses `qrcode`.
 
-## Upgrade from v0.9
+### Safety rule
 
-No database migration and no new environment variables are required.
+> Scanning a QR code never sends funds.
+
+QR/payment-link data only populates a PaymentIntent. The payer still sees the existing route review and must explicitly approve the transaction.
+
+### Deliberate v0.11 boundary
+
+Payment requests are stateless in this first version: the payment link contains the recipient, optional amount and reference. Krypto121 does not yet persist request status such as `pending` / `paid`. Durable invoice-style requests can be added later when needed.
+
+No Supabase migration is required.
+No new environment variables are required.
+
+## Install / upgrade
+
+v0.11 adds npm dependencies, so run:
 
 ```bash
 npm install
@@ -58,17 +71,19 @@ npm run build
 npm run dev
 ```
 
-## v0.10 acceptance test
+## Acceptance test
 
-1. Sign in and confirm the main **My wallet** card no longer shows an explorer link.
-2. Open **My wallets** and confirm owned wallets show USDTd plus **Network fees · Ready / Needs funds**, not a CELO number.
-3. Confirm watch-only wallets still show their USDTd balance and remain view-only.
-4. Open **Receive** and confirm no Celo/Blockscout language appears in the normal flow.
-5. Create a payment and confirm the route reads **Direct stablecoin transfer**.
-6. Confirm Network fee reads **Paid by the source wallet**.
-7. Complete a test payment and confirm the success screen is simple.
-8. Expand **Technical details** and verify the Celo Sepolia network, transaction ID and blockchain link are available.
-9. Open **Payment history** and verify blockchain details are similarly collapsed.
-10. Open **Developer / test tools** and confirm the Celo Sepolia technical information and wallet explorer remain available.
+1. Open **Receive**.
+2. Choose an owned wallet.
+3. Leave amount empty, create a request and confirm a QR + link appear.
+4. Enter an amount and reference, regenerate, and confirm both are represented in the payment request.
+5. Copy the link and open it in a private/incognito browser.
+6. Confirm the request is shown before login.
+7. Login/create an account and confirm Send opens with recipient, amount and reference populated.
+8. On another logged-in Krypto121 session, open **Send → Scan QR** and scan the generated QR.
+9. Confirm the same payment details populate without sending anything automatically.
+10. Review and approve a small USDTd payment and confirm the existing settlement/history flow still works.
+11. Scan a QR containing only a raw EVM wallet address and confirm Krypto121 fills only the recipient, leaving amount/reference for the payer.
+12. Deny camera permission and confirm the paste-payment-link fallback still works.
 
-See `docs/ARCHITECTURE.md` and `docs/upgrades/UPGRADE-v0.10.md`.
+See `docs/ARCHITECTURE.md` and `docs/upgrades/UPGRADE-v0.11.md`.

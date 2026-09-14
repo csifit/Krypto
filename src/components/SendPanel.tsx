@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { isAddress } from "viem";
 import { sendTestUsdt } from "@/lib/blockchain/usdt";
@@ -10,6 +10,8 @@ import {
   quoteDirectCeloIntent,
 } from "@/lib/payments/directCelo";
 import { savePaymentRecord } from "@/lib/backend/client";
+import QrScanner from "@/components/QrScanner";
+import { parsePaymentRequestPayload, type PaymentRequest } from "@/lib/payments/paymentRequest";
 import type {
   Beneficiary,
   PaymentIntent,
@@ -25,19 +27,22 @@ export default function SendPanel({
   accountWalletAddress,
   sourceWallets,
   beneficiaries,
+  initialRequest,
   onSent,
 }: {
   accountWalletAddress: `0x${string}`;
   sourceWallets: PaymentSourceWallet[];
   beneficiaries: Beneficiary[];
+  initialRequest?: PaymentRequest;
   onSent(): Promise<void>;
 }) {
   const [sourceId, setSourceId] = useState(
     sourceWallets[0]?.id ?? "",
   );
-  const [recipient, setRecipient] = useState("");
-  const [amount, setAmount] = useState("");
-  const [memo, setMemo] = useState("");
+  const [recipient, setRecipient] = useState(initialRequest?.recipient ?? "");
+  const [amount, setAmount] = useState(initialRequest?.amount ?? "");
+  const [memo, setMemo] = useState(initialRequest?.memo ?? "");
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [intent, setIntent] = useState<PaymentIntent | null>(null);
   const [quote, setQuote] = useState<PaymentQuote | null>(null);
   const [stage, setStage] = useState<"form" | "review" | "sending" | "success">(
@@ -50,6 +55,35 @@ export default function SendPanel({
 
   const selectedSource =
     sourceWallets.find((source) => source.id === sourceId) ?? sourceWallets[0];
+
+  useEffect(() => {
+    if (!initialRequest) return;
+    setRecipient(initialRequest.recipient);
+    setAmount(initialRequest.amount ?? "");
+    setMemo(initialRequest.memo ?? "");
+    setError(null);
+    setStage("form");
+  }, [initialRequest]);
+
+  function applyScannedPayment(value: string) {
+    const request = parsePaymentRequestPayload(value);
+
+    if (!request) {
+      setError(
+        "Unsupported QR code. Scan a Krypto121 payment request or compatible wallet QR.",
+      );
+      return;
+    }
+
+    setRecipient(request.recipient);
+    setAmount(request.amount ?? "");
+    setMemo(request.memo ?? "");
+    setScannerOpen(false);
+    setError(null);
+    setIntent(null);
+    setQuote(null);
+    setStage("form");
+  }
 
   const sourceBalance = useUsdtBalance(selectedSource?.wallet.address);
 
@@ -184,6 +218,7 @@ export default function SendPanel({
     setError(null);
     setHash(null);
     setRecordWarning(null);
+    setScannerOpen(false);
     setStage("form");
   }
 
@@ -343,7 +378,19 @@ export default function SendPanel({
       ) : null}
 
       <label className="field">
-        <span>Recipient wallet address</span>
+        <span className="fieldLabelWithAction">
+          <span>Recipient wallet address</span>
+          <button
+            className="textButton"
+            type="button"
+            onClick={() => {
+              setScannerOpen((value) => !value);
+              setError(null);
+            }}
+          >
+            {scannerOpen ? "Close scanner" : "Scan QR"}
+          </button>
+        </span>
         <input
           value={recipient}
           onChange={(event) => setRecipient(event.target.value.trim())}
@@ -351,6 +398,13 @@ export default function SendPanel({
           autoComplete="off"
         />
       </label>
+
+      {scannerOpen ? (
+        <QrScanner
+          onScan={applyScannedPayment}
+          onClose={() => setScannerOpen(false)}
+        />
+      ) : null}
 
       <label className="field">
         <span>Amount</span>

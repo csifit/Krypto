@@ -1171,3 +1171,144 @@ code {
     gap: 4px;
   }
 }
+
+/* v0.11 payment requests, QR generation and scanning */
+.incomingPaymentRequest {
+  display: grid;
+  gap: 4px;
+  width: min(420px, 100%);
+  margin-top: 28px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  padding: 18px;
+}
+
+.incomingPaymentRequest > span,
+.incomingPaymentRequest > small {
+  color: var(--muted);
+}
+
+.incomingPaymentRequest > strong {
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.paymentRequestBuilder {
+  margin-top: 26px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+
+.paymentRequestHeading h3,
+.qrScannerHeader h3 {
+  margin: 4px 0 0;
+  font-size: 20px;
+  letter-spacing: -0.025em;
+}
+
+.paymentRequestResult {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--soft);
+  padding: 18px;
+}
+
+.paymentQrFrame {
+  width: min(300px, 100%);
+  overflow: hidden;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.paymentQrFrame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.paymentRequestSummary {
+  display: grid;
+  gap: 5px;
+}
+
+.paymentRequestSummary strong {
+  font-size: 20px;
+}
+
+.paymentRequestSummary span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.paymentRequestActions {
+  margin-top: 0;
+}
+
+.fieldLabelWithAction {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fieldLabelWithAction .textButton {
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.qrScanner {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--soft);
+  padding: 16px;
+}
+
+.qrScannerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.qrVideoFrame {
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  margin-top: 14px;
+  border-radius: 14px;
+  background: #000000;
+}
+
+.qrVideoFrame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qrPasteForm {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.qrPasteForm .field {
+  margin-top: 0;
+}
+
+.qrPasteForm .secondaryButton {
+  justify-self: start;
+}
+
+@media (max-width: 560px) {
+  .paymentRequestActions .secondaryButton,
+  .qrPasteForm .secondaryButton {
+    width: 100%;
+  }
+}

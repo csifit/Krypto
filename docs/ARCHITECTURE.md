@@ -1,6 +1,6 @@
 # Krypto121 Architecture
 
-## Product boundary  
+## Product boundary
 
 Krypto121 provides the user experience and payment orchestration without becoming the holder of customer wallet keys.
 
@@ -246,18 +246,24 @@ Allow a connected linked wallet to become the source wallet for a PaymentIntent.
 Read balances for owned and watch-only wallets, aggregate owned balances, and choose a receive wallet. Complete.
 
 ### M9 — Blockchain abstraction UX
-Keep blockchain mechanics out of the normal product experience while retaining technical detail for advanced users and development. **Current.**
+Keep blockchain mechanics out of the normal product experience while retaining technical detail for advanced users and development. Complete.
 
-### M10 — Router expansion
-Add additional crypto routes only when we have a concrete need/provider.
+### M10 — Payment requests / QR
+Generate QR/payment links for Receive and scan/open them to populate a PaymentIntent. **Current.**
 
-### M11 — Gas UX
-Hide native-token complexity using the safest supported Celo mechanism.
+### M11 — Payment readiness / fee preflight
+Check source balance, network-fee readiness, recipient validity, and route readiness before approval.
 
-### M12 — External settlement rails
+### M12 — Router expansion
+Add an alternative route only when we have a concrete route/provider to compare with direct settlement.
+
+### M13 — Gas UX
+Hide native-token complexity using the safest supported mechanism.
+
+### M14 — External settlement rails
 Off-ramp / FX / CBDC integrations through regulated providers.
 
-### M13 — Mainnet preparation
+### M15 — Mainnet preparation
 Security review, monitoring, production RPC, compliance boundaries, and mainnet guardrails.
 
 ## Principle
@@ -346,3 +352,36 @@ Technical details
 The normal wallet directory does not need to teach users what CELO is. For an owned wallet it may display a simple network-fee readiness state derived from the native-token balance. Watch-only wallets do not receive this status because they cannot authorize transactions.
 
 This does not change the settlement implementation. Celo remains the development blockchain, and the source wallet still pays the underlying transaction fee. True gas abstraction is a later milestone.
+
+
+## v0.11 — Payment requests, QR and payment links
+
+Krypto121 adds a `PaymentRequest` input/output layer without changing the authorization boundary.
+
+```text
+Receive wallet
+  -> PaymentRequest
+  -> shareable /pay link
+  -> QR code
+
+QR / link / compatible wallet QR
+  -> parse
+  -> populate PaymentIntent
+  -> route + quote
+  -> review
+  -> explicit user approval
+```
+
+The first PaymentRequest format contains only the data needed for the current direct test payment:
+
+```text
+version
+recipient wallet
+asset (USDTd)
+amount (optional)
+reference/memo (optional)
+```
+
+A QR code is an input mechanism, never an authorization mechanism. Scanning must never execute a transaction automatically.
+
+v0.11 requests are stateless and encoded in the payment link. This keeps the milestone simple and avoids a database/request lifecycle before there is a concrete business need for persistent invoice-style requests.

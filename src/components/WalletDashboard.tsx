@@ -23,6 +23,7 @@ import {
   syncProfile,
 } from "@/lib/backend/client";
 import type { Beneficiary } from "@/lib/payments/types";
+import type { PaymentRequest } from "@/lib/payments/paymentRequest";
 import type { LinkedWalletView, WatchWallet } from "@/lib/wallet/directory";
 import { createPrivyWalletProvider } from "@/lib/wallet/privy";
 import type { PaymentSourceWallet } from "@/lib/wallet/types";
@@ -55,11 +56,15 @@ function displayProvider(value?: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-export default function WalletDashboard() {
+export default function WalletDashboard({
+  initialPaymentRequest,
+}: {
+  initialPaymentRequest?: PaymentRequest;
+} = {}) {
   const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
   const [showReceive, setShowReceive] = useState(false);
-  const [showSend, setShowSend] = useState(false);
+  const [showSend, setShowSend] = useState(Boolean(initialPaymentRequest));
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SecondarySection>(null);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
@@ -330,6 +335,22 @@ export default function WalletDashboard() {
           <p className="landingLead">
             Create a wallet or bring the wallets you already use. Manage them from one place.
           </p>
+
+          {initialPaymentRequest ? (
+            <div className="incomingPaymentRequest">
+              <span>Payment request</span>
+              <strong>
+                {initialPaymentRequest.amount
+                  ? `${initialPaymentRequest.amount} USDTd`
+                  : "Amount to enter"}
+              </strong>
+              <small>To {shortAddress(initialPaymentRequest.recipient)}</small>
+              {initialPaymentRequest.memo ? (
+                <small>Reference: {initialPaymentRequest.memo}</small>
+              ) : null}
+            </div>
+          ) : null}
+
           <button className="primaryButton landingCta" onClick={login}>
             Create account/Log in
           </button>
@@ -440,6 +461,7 @@ export default function WalletDashboard() {
                 accountWalletAddress={walletProvider.address}
                 sourceWallets={paymentSources}
                 beneficiaries={beneficiaries}
+                initialRequest={initialPaymentRequest}
                 onSent={refreshAll}
               />
             ) : null}

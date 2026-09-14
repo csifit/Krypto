@@ -8,6 +8,7 @@ import DashboardSidebar, { type SecondarySection } from "@/components/DashboardS
 import ThemeToggle from "@/components/ThemeToggle";
 import WalletsPanel from "@/components/WalletsPanel";
 import { useWalletPortfolio } from "@/hooks/useWalletPortfolio";
+import { useBitcoinPortfolio } from "@/hooks/useBitcoinPortfolio";
 import {
   createWatchWallet,
   deleteWalletLabel,
@@ -91,7 +92,9 @@ export default function MyWalletsPage() {
     const addresses: `0x${string}`[] = [];
     if (embeddedAddress) addresses.push(embeddedAddress);
     linkedWallets.forEach((wallet) => addresses.push(wallet.address));
-    watchWallets.forEach((wallet) => addresses.push(wallet.address));
+    watchWallets
+      .filter((wallet) => wallet.chainType === "ethereum" && isAddress(wallet.address))
+      .forEach((wallet) => addresses.push(wallet.address as `0x${string}`));
     return addresses.filter(
       (address, index, all) =>
         all.findIndex((candidate) => candidate.toLowerCase() === address.toLowerCase()) === index,
@@ -106,6 +109,19 @@ export default function MyWalletsPage() {
   }, [embeddedAddress, linkedWallets]);
 
   const portfolio = useWalletPortfolio(trackedAddresses);
+
+  const bitcoinAddresses = useMemo(
+    () => watchWallets.filter((wallet) => wallet.chainType === "bitcoin").map((wallet) => wallet.address),
+    [watchWallets],
+  );
+  const bitcoinPortfolio = useBitcoinPortfolio(bitcoinAddresses, getAccessToken);
+
+  const watchedBtcTotal = useMemo(() => {
+    return bitcoinAddresses.reduce((total, address) => {
+      const value = Number(bitcoinPortfolio.balances[address]?.balance ?? "0");
+      return Number.isFinite(value) ? total + value : total;
+    }, 0);
+  }, [bitcoinAddresses, bitcoinPortfolio.balances]);
 
   const ownedTotal = useMemo(() => {
     return ownedAddresses.reduce((total, address) => {
@@ -171,8 +187,12 @@ export default function MyWalletsPage() {
     connectWallet();
   }
 
-  async function addWatchWallet(label: string, address: `0x${string}`) {
-    const created = await createWatchWallet(getAccessToken, { label, address });
+  async function addWatchWallet(
+    label: string,
+    address: string,
+    chainType: "ethereum" | "bitcoin",
+  ) {
+    const created = await createWatchWallet(getAccessToken, { label, address, chainType });
     setWatchWallets((current) => [...current, created]);
   }
 
@@ -276,6 +296,11 @@ export default function MyWalletsPage() {
             <div className="walletPageSummary">
               <strong>{portfolio.loading ? "…" : formatBalance(ownedTotal)} USDTd</strong>
               <span>{ownedAddresses.length} owned {ownedAddresses.length === 1 ? "wallet" : "wallets"}</span>
+              {bitcoinAddresses.length ? (
+                <span className="walletPageBitcoinSummary">
+                  {bitcoinPortfolio.loading ? "…" : watchedBtcTotal.toFixed(8)} BTC watched
+                </span>
+              ) : null}
             </div>
           </header>
 
@@ -286,7 +311,8 @@ export default function MyWalletsPage() {
             linkedWallets={linkedWallets}
             watchWallets={watchWallets}
             balances={portfolio.balances}
-            balancesLoading={portfolio.loading}
+            bitcoinBalances={bitcoinPortfolio.balances}
+            balancesLoading={portfolio.loading || bitcoinPortfolio.loading}
             loading={loading}
             linkStatus={linkStatus}
             onLinkExternal={linkExternalWallet}
@@ -294,7 +320,9 @@ export default function MyWalletsPage() {
             onAddWatch={addWatchWallet}
             onRemoveWatch={removeWatchWallet}
             walletLabels={walletLabelMap}
-            onRefreshBalances={portfolio.refresh}
+            onRefreshBalances={async () => {
+              await Promise.all([portfolio.refresh(), bitcoinPortfolio.refresh()]);
+            }}
             onMakePayment={makePayment}
             onRenameWallet={renameWallet}
             onResetWalletName={resetWalletName}

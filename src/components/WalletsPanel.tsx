@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { isAddress } from "viem";
+import { looksLikeBitcoinMainnetAddress, watchAddressKey } from "@/lib/bitcoin/address";
+import type { BitcoinBalanceSnapshot } from "@/hooks/useBitcoinPortfolio";
 import type { WalletBalanceSnapshot } from "@/hooks/useWalletPortfolio";
 import type { LinkedWalletView, WatchWallet } from "@/lib/wallet/directory";
 
@@ -21,7 +23,7 @@ function formatBalance(value: string) {
 type WalletRow = {
   id: string;
   label: string;
-  address: `0x${string}`;
+  address: string;
   badge: string;
   type: string;
   ownership: string;
@@ -32,6 +34,7 @@ type WalletRow = {
   watchWalletId?: string;
   defaultLabel: string;
   renameable: boolean;
+  chainType: "ethereum" | "bitcoin";
 };
 
 export default function WalletsPanel({
@@ -39,6 +42,7 @@ export default function WalletsPanel({
   linkedWallets,
   watchWallets,
   balances,
+  bitcoinBalances,
   balancesLoading,
   loading,
   linkStatus,
@@ -56,12 +60,17 @@ export default function WalletsPanel({
   linkedWallets: LinkedWalletView[];
   watchWallets: WatchWallet[];
   balances: Record<string, WalletBalanceSnapshot>;
+  bitcoinBalances: Record<string, BitcoinBalanceSnapshot>;
   balancesLoading: boolean;
   loading: boolean;
   linkStatus?: string | null;
   walletLabels: Record<string, string>;
   onLinkExternal(): void;
-  onAddWatch(label: string, address: `0x${string}`): Promise<void>;
+  onAddWatch(
+    label: string,
+    address: string,
+    chainType: "ethereum" | "bitcoin",
+  ): Promise<void>;
   onRemoveWatch(id: string): Promise<void>;
   onConnectExternal(): void;
   onRefreshBalances(): Promise<void>;
@@ -72,6 +81,7 @@ export default function WalletsPanel({
   const [showWatchForm, setShowWatchForm] = useState(false);
   const [label, setLabel] = useState("");
   const [address, setAddress] = useState("");
+  const [watchChainType, setWatchChainType] = useState<"ethereum" | "bitcoin">("ethereum");
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
@@ -82,11 +92,15 @@ export default function WalletsPanel({
 
   const knownAddresses = useMemo(() => {
     const values = new Set<string>();
-    if (embeddedAddress) values.add(embeddedAddress.toLowerCase());
-    linkedWallets.forEach((wallet) => values.add(wallet.address.toLowerCase()));
-    watchWallets.forEach((wallet) => values.add(wallet.address.toLowerCase()));
+    if (embeddedAddress) values.add(watchAddressKey("ethereum", embeddedAddress));
+    linkedWallets.forEach((wallet) =>
+      values.add(watchAddressKey("ethereum", wallet.address)),
+    );
+    watchWallets.forEach((wallet) =>
+      values.add(watchAddressKey(wallet.chainType, wallet.address)),
+    );
     return values;
-  }, [embeddedAddress, linkedWallets, watchWallets, walletLabels]);
+  }, [embeddedAddress, linkedWallets, watchWallets]);
 
   const rows = useMemo<WalletRow[]>(() => {
     const result: WalletRow[] = [];
@@ -98,6 +112,7 @@ export default function WalletsPanel({
         label: walletLabels[embeddedAddress.toLowerCase()] ?? defaultLabel,
         defaultLabel,
         renameable: true,
+        chainType: "ethereum",
         address: embeddedAddress,
         badge: "Active",
         type: "Krypto121 wallet",
@@ -116,6 +131,7 @@ export default function WalletsPanel({
         label: walletLabels[wallet.address.toLowerCase()] ?? defaultLabel,
         defaultLabel,
         renameable: true,
+        chainType: "ethereum",
         address: wallet.address,
         badge: "Linked",
         type: "Linked wallet",
@@ -133,12 +149,13 @@ export default function WalletsPanel({
         label: wallet.label,
         defaultLabel: wallet.label,
         renameable: false,
+        chainType: wallet.chainType,
         address: wallet.address,
         badge: "Watch-only",
-        type: "Watch-only wallet",
+        type: wallet.chainType === "bitcoin" ? "Bitcoin watch-only" : "Watch-only wallet",
         ownership: "No ownership claim",
         connection: "View only",
-        provider: "Address only",
+        provider: wallet.chainType === "bitcoin" ? "Bitcoin network" : "Address only",
         canPay: false,
         needsConnect: false,
         watchWalletId: wallet.id,
@@ -160,21 +177,27 @@ export default function WalletsPanel({
       return;
     }
 
-    if (!isAddress(trimmedAddress)) {
-      setFormError("Enter a valid wallet address");
+    if (watchChainType === "ethereum" && !isAddress(trimmedAddress)) {
+      setFormError("Enter a valid stablecoin wallet address");
       return;
     }
 
-    if (knownAddresses.has(trimmedAddress.toLowerCase())) {
+    if (watchChainType === "bitcoin" && !looksLikeBitcoinMainnetAddress(trimmedAddress)) {
+      setFormError("Enter a valid Bitcoin address");
+      return;
+    }
+
+    if (knownAddresses.has(watchAddressKey(watchChainType, trimmedAddress))) {
       setFormError("That wallet is already in My wallets");
       return;
     }
 
     setSaving(true);
     try {
-      await onAddWatch(trimmedLabel, trimmedAddress as `0x${string}`);
+      await onAddWatch(trimmedLabel, trimmedAddress, watchChainType);
       setLabel("");
       setAddress("");
+      setWatchChainType("ethereum");
       setShowWatchForm(false);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Could not save wallet");
@@ -212,7 +235,7 @@ export default function WalletsPanel({
     setRenameError(null);
 
     try {
-      await onRenameWallet(wallet.address, next);
+      await onRenameWallet(wallet.address as `0x${string}`, next);
       setRenamingAddress(null);
       setRenameValue("");
     } catch (error) {
@@ -229,7 +252,7 @@ export default function WalletsPanel({
     setRenameError(null);
 
     try {
-      await onResetWalletName(wallet.address);
+      await onResetWalletName(wallet.address as `0x${string}`);
       setRenamingAddress(null);
       setRenameValue("");
     } catch (error) {
@@ -281,11 +304,25 @@ export default function WalletsPanel({
             />
           </label>
           <label>
+            <span>Wallet type</span>
+            <select
+              value={watchChainType}
+              onChange={(event) => {
+                setWatchChainType(event.target.value as "ethereum" | "bitcoin");
+                setAddress("");
+                setFormError(null);
+              }}
+            >
+              <option value="ethereum">Stablecoin wallet</option>
+              <option value="bitcoin">Bitcoin wallet</option>
+            </select>
+          </label>
+          <label>
             <span>Wallet address</span>
             <input
               value={address}
               onChange={(event) => setAddress(event.target.value)}
-              placeholder="0x…"
+              placeholder={watchChainType === "bitcoin" ? "bc1… / 1… / 3…" : "0x…"}
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
@@ -309,12 +346,23 @@ export default function WalletsPanel({
 
       <div className="walletAccordionList">
         {rows.map((wallet) => {
-          const snapshot = balances[wallet.address.toLowerCase()];
-          const balanceText = snapshot?.error
-            ? "Unavailable"
-            : snapshot
-              ? `${formatBalance(snapshot.usdt)} USDTd`
-              : "Loading…";
+          const snapshot = wallet.chainType === "ethereum"
+            ? balances[wallet.address.toLowerCase()]
+            : undefined;
+          const bitcoinSnapshot = wallet.chainType === "bitcoin"
+            ? bitcoinBalances[wallet.address]
+            : undefined;
+          const balanceText = wallet.chainType === "bitcoin"
+            ? bitcoinSnapshot?.error
+              ? "Unavailable"
+              : bitcoinSnapshot
+                ? `${bitcoinSnapshot.balance} BTC`
+                : "Loading…"
+            : snapshot?.error
+              ? "Unavailable"
+              : snapshot
+                ? `${formatBalance(snapshot.usdt)} USDTd`
+                : "Loading…";
           const networkReady = snapshot ? Number(snapshot.celo) > 0 : false;
 
           return (
@@ -419,15 +467,17 @@ export default function WalletsPanel({
                     <strong>{balanceText}</strong>
                   </div>
                   <div>
-                    <span>Network fees</span>
+                    <span>{wallet.chainType === "bitcoin" ? "Network" : "Network fees"}</span>
                     <strong>
-                      {wallet.type === "Watch-only wallet"
-                        ? "Not applicable"
-                        : snapshot?.error
-                          ? "Unavailable"
-                          : snapshot
-                            ? networkReady ? "Ready" : "Needs funds"
-                            : "Loading…"}
+                      {wallet.chainType === "bitcoin"
+                        ? "Bitcoin"
+                        : wallet.type === "Watch-only wallet"
+                          ? "Not applicable"
+                          : snapshot?.error
+                            ? "Unavailable"
+                            : snapshot
+                              ? networkReady ? "Ready" : "Needs funds"
+                              : "Loading…"}
                     </strong>
                   </div>
                   <div>
@@ -436,14 +486,14 @@ export default function WalletsPanel({
                   </div>
                   <div>
                     <span>Environment</span>
-                    <strong>Test</strong>
+                    <strong>{wallet.chainType === "bitcoin" ? "Mainnet" : "Test"}</strong>
                   </div>
                 </div>
 
                 <div className="walletAccordionActions">
                   <button
                     className="primaryButton"
-                    onClick={() => onMakePayment(wallet.address)}
+                    onClick={() => onMakePayment(wallet.address as `0x${string}`)}
                     disabled={!wallet.canPay}
                   >
                     Make payment from this wallet
@@ -480,9 +530,24 @@ export default function WalletsPanel({
                   </p>
                 ) : null}
 
+                {wallet.chainType === "bitcoin" ? (
+                  <a
+                    className="textLink walletBitcoinExplorer"
+                    href={`https://mempool.space/address/${wallet.address}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View on Bitcoin explorer
+                  </a>
+                ) : null}
+
                 <div className="walletTechnicalLine">
                   <span>Technical:</span>
-                  <strong>Celo Sepolia · Test USDT</strong>
+                  <strong>
+                    {wallet.chainType === "bitcoin"
+                      ? "Bitcoin mainnet · Read only"
+                      : "Celo Sepolia · Test USDT"}
+                  </strong>
                 </div>
               </div>
             </details>
@@ -494,7 +559,7 @@ export default function WalletsPanel({
       </div>
 
       <p className="walletDirectoryNote">
-        Watch-only wallets are excluded from your owned balance and can never make payments.
+        Watch-only wallets are excluded from your owned balance and can never make payments. Bitcoin support is currently view-only.
       </p>
     </section>
   );

@@ -2,37 +2,40 @@
 
 **Krypto121 is a smart payment-routing wallet. Create a wallet or bring the wallets you already use. Manage them from one place.**
 
-## v0.14 — Wallet names
+## v0.15 — Bitcoin watch-only
 
-Users can now give owned wallets simple private names.
+My wallets can now monitor Bitcoin addresses as well as the existing stablecoin/EVM wallets.
+
+Choose:
 
 ```text
-Company treasury
-Operations
-Personal
+My wallets
+→ Add watch-only
+→ Wallet type: Bitcoin wallet
+→ Bitcoin address
 ```
 
-Open **My wallets**, expand an owned wallet and choose **Rename**.
+The wallet row then shows its BTC balance and expands to full read-only details.
 
-The name follows the wallet into:
+Bitcoin support in v0.15 is deliberately limited to monitoring:
 
-- My wallets
-- Send → Pay from
-- Receive → Receive into
+- no Bitcoin private keys;
+- no seed phrases;
+- no Bitcoin signing;
+- no Bitcoin sending;
+- no Bitcoin payment routing yet.
 
-The wallet address, provider and ownership status are unchanged.
-
-Watch-only wallets continue to use their existing saved labels.
+Balances are read from public Bitcoin blockchain data server-side.
 
 ## Upgrade
 
-Apply migration:
+Apply:
 
 ```text
-supabase/migrations/202609140003_wallet_labels.sql
+supabase/migrations/202609140004_bitcoin_watch_wallets.sql
 ```
 
-Then:
+Then run:
 
 ```bash
 npm install
@@ -40,5 +43,3 @@ npm run build
 ```
 
 No new environment variables are required.
-
-See `docs/upgrades/UPGRADE-v0.14.md`.

@@ -1,4 +1,6 @@
 import { isAddress } from "viem";
+import { looksLikeBitcoinMainnetAddress } from "@/lib/bitcoin/address";
+import { validateBitcoinAddress } from "@/lib/server/bitcoin";
 import { AuthError, requirePrivyUser } from "@/lib/server/privy";
 import { ensureProfile } from "@/lib/server/profile";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
@@ -53,17 +55,42 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       label?: string;
       address?: string;
+      chainType?: "ethereum" | "bitcoin";
     };
 
     const label = body.label?.trim();
     const address = body.address?.trim();
+    const chainType = body.chainType === "bitcoin" ? "bitcoin" : "ethereum";
 
     if (!label || label.length > 100) {
       return Response.json({ error: "Enter a wallet label" }, { status: 400 });
     }
 
-    if (!address || !isAddress(address)) {
-      return Response.json({ error: "Enter a valid EVM wallet address" }, { status: 400 });
+    if (!address) {
+      return Response.json({ error: "Enter a wallet address" }, { status: 400 });
+    }
+
+    if (chainType === "ethereum" && !isAddress(address)) {
+      return Response.json({ error: "Enter a valid stablecoin wallet address" }, { status: 400 });
+    }
+
+    if (chainType === "bitcoin") {
+      if (!looksLikeBitcoinMainnetAddress(address)) {
+        return Response.json({ error: "Enter a valid Bitcoin address" }, { status: 400 });
+      }
+
+      try {
+        const valid = await validateBitcoinAddress(address);
+        if (!valid) {
+          return Response.json({ error: "Enter a valid Bitcoin address" }, { status: 400 });
+        }
+      } catch (error) {
+        console.error("bitcoin address validation failed", error);
+        return Response.json(
+          { error: "Could not verify the Bitcoin address right now" },
+          { status: 503 },
+        );
+      }
     }
 
     const supabase = getSupabaseAdmin();
@@ -73,7 +100,7 @@ export async function POST(request: Request) {
         privy_user_id: userId,
         label,
         address,
-        chain_type: "ethereum",
+        chain_type: chainType,
       })
       .select("id, label, address, chain_type, created_at")
       .single();

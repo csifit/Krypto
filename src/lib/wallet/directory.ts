@@ -1,8 +1,8 @@
 export type WatchWallet = {
   id: string;
   label: string;
-  address: `0x${string}`;
-  chainType: "ethereum";
+  address: string;
+  chainType: "ethereum" | "bitcoin";
   createdAt: string;
 };
 

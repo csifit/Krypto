@@ -108,7 +108,7 @@ export async function listWatchWallets(getAccessToken: AccessTokenGetter) {
 
 export async function createWatchWallet(
   getAccessToken: AccessTokenGetter,
-  input: { label: string; address: `0x${string}` },
+  input: { label: string; address: string; chainType: "ethereum" | "bitcoin" },
 ) {
   const result = await authedRequest<{ watchWallet: WatchWallet }>(
     getAccessToken,
@@ -164,5 +164,20 @@ export async function deleteWalletLabel(
     getAccessToken,
     `/api/wallet-labels?address=${encodeURIComponent(address)}`,
     { method: "DELETE" },
+  );
+}
+
+
+export async function readBitcoinWatchBalance(
+  getAccessToken: AccessTokenGetter,
+  address: string,
+) {
+  return authedRequest<{
+    balance: string;
+    confirmed: string;
+    pending: string;
+  }>(
+    getAccessToken,
+    `/api/bitcoin/balance?address=${encodeURIComponent(address)}`,
   );
 }

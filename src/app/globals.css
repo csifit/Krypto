@@ -1680,3 +1680,28 @@ code {
     flex: 1;
   }
 }
+
+
+/* v0.15 Bitcoin watch-only wallets */
+.watchWalletForm select {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  padding: 0 13px;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.walletPageBitcoinSummary {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.walletBitcoinExplorer {
+  display: inline-block;
+  margin-top: 16px;
+}

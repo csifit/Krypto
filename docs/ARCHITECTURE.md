@@ -255,18 +255,24 @@ Generate QR/payment links for Receive and scan/open them to populate a PaymentIn
 Check source balance, network-fee readiness, recipient validity, and route readiness before approval. Complete.
 
 ### M12 — Dedicated wallet management
-Move My wallets to a full page with compact accordion rows and direct payment-source actions. **Current.**
+Move My wallets to a full page with compact accordion rows and direct payment-source actions. Complete.
 
-### M13 — Router expansion
-Add an alternative route only when we have a concrete route/provider to compare with direct settlement.
+### M13 — Wallet names
+Let users give owned wallets simple private names that follow them into Send and Receive. Complete.
 
-### M14 — Gas UX
+### M14 — Bitcoin watch-only
+Park Bitcoin addresses and monitor BTC balances without custody or signing. **Current.**
+
+### M15 — Router expansion
+Add an alternative route only when there is a concrete route/provider to compare with direct settlement.
+
+### M16 — Gas UX
 Hide native-token complexity using the safest supported mechanism.
 
-### M15 — External settlement rails
+### M17 — External settlement rails
 Off-ramp / FX / CBDC integrations through regulated providers.
 
-### M16 — Mainnet preparation
+### M18 — Mainnet preparation
 Security review, monitoring, production RPC, compliance boundaries, and mainnet guardrails.
 
 ## Principle
@@ -444,3 +450,36 @@ The custom name is reused consistently in:
 - Receive destination selection
 
 Watch-only wallets keep their existing label from `watch_wallets`.
+
+
+## v0.15 — Bitcoin watch-only wallets
+
+Bitcoin enters Krypto121 first as a read-only wallet type.
+
+```text
+My wallets
+  |
+  +-- Krypto121 / linked EVM wallets
+  +-- EVM watch-only addresses
+  +-- Bitcoin watch-only addresses
+```
+
+For a Bitcoin watch-only wallet, Krypto121 stores only:
+
+```text
+label
+Bitcoin address
+network type
+```
+
+Krypto121 never asks for a Bitcoin private key or seed phrase.
+
+The balance is read from public Bitcoin blockchain data through a server-side API call. A Bitcoin watch-only wallet:
+
+- shows BTC balance;
+- can open a Bitcoin explorer;
+- is excluded from owned balances;
+- cannot be selected as a payment source;
+- cannot sign or broadcast a transaction.
+
+This creates the multi-network wallet-directory foundation without introducing Bitcoin transaction logic prematurely.

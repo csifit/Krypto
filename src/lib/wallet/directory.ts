@@ -11,3 +11,10 @@ export type LinkedWalletView = {
   provider: string;
   connected: boolean;
 };
+
+
+export type WalletLabel = {
+  address: `0x${string}`;
+  label: string;
+  updatedAt: string;
+};

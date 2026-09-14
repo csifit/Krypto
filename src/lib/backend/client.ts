@@ -2,7 +2,7 @@ import type {
   Beneficiary,
   LocalPaymentRecord,
 } from "@/lib/payments/types";
-import type { WatchWallet } from "@/lib/wallet/directory";
+import type { WalletLabel, WatchWallet } from "@/lib/wallet/directory";
 
 type AccessTokenGetter = () => Promise<string | null>;
 
@@ -128,6 +128,41 @@ export async function deleteWatchWallet(
   await authedRequest<{ ok: true }>(
     getAccessToken,
     `/api/watch-wallets?id=${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+}
+
+
+export async function listWalletLabels(getAccessToken: AccessTokenGetter) {
+  const result = await authedRequest<{ walletLabels: WalletLabel[] }>(
+    getAccessToken,
+    "/api/wallet-labels",
+  );
+  return result.walletLabels;
+}
+
+export async function saveWalletLabel(
+  getAccessToken: AccessTokenGetter,
+  input: { address: `0x${string}`; label: string },
+) {
+  const result = await authedRequest<{ walletLabel: WalletLabel }>(
+    getAccessToken,
+    "/api/wallet-labels",
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+  );
+  return result.walletLabel;
+}
+
+export async function deleteWalletLabel(
+  getAccessToken: AccessTokenGetter,
+  address: `0x${string}`,
+) {
+  await authedRequest<{ ok: true }>(
+    getAccessToken,
+    `/api/wallet-labels?address=${encodeURIComponent(address)}`,
     { method: "DELETE" },
   );
 }

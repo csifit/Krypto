@@ -2,42 +2,43 @@
 
 **Krypto121 is a smart payment-routing wallet. Create a wallet or bring the wallets you already use. Manage them from one place.**
 
-## v0.13 — Dedicated My wallets page
+## v0.14 — Wallet names
 
-`My wallets` now has its own full page:
-
-```text
-/wallets
-```
-
-Each wallet is shown as a compact one-line accordion. The top row shows only the essentials:
+Users can now give owned wallets simple private names.
 
 ```text
-Wallet | address | balance | status
+Company treasury
+Operations
+Personal
 ```
 
-Expand a wallet to see its full details and actions.
+Open **My wallets**, expand an owned wallet and choose **Rename**.
 
-Owned, connected wallets include **Make payment from this wallet**, which opens the existing Send flow with that wallet preselected.
+The name follows the wallet into:
 
-Watch-only wallets remain view-only and cannot make payments.
+- My wallets
+- Send → Pay from
+- Receive → Receive into
 
-### Retained wallet actions
+The wallet address, provider and ownership status are unchanged.
 
-- Link existing wallet
-- Add watch-only wallet
-- Connect linked wallet
-- Refresh balances
-- Copy address
-- Remove watch-only wallet
+Watch-only wallets continue to use their existing saved labels.
 
-### Upgrade
+## Upgrade
 
-No Supabase migration and no new environment variables are required.
+Apply migration:
+
+```text
+supabase/migrations/202609140003_wallet_labels.sql
+```
+
+Then:
 
 ```bash
 npm install
 npm run build
 ```
 
-See `docs/upgrades/UPGRADE-v0.13.md`.
+No new environment variables are required.
+
+See `docs/upgrades/UPGRADE-v0.14.md`.

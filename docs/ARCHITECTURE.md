@@ -414,3 +414,33 @@ The payment action does not create a new payment system. It reuses the existing 
 Watch-only wallets remain visible but cannot be selected as payment sources. Linked wallets must be connected before they can sign.
 
 The page structure deliberately leaves room for future wallet/network types such as Bitcoin without adding Bitcoin transaction logic yet.
+
+
+## v0.14 — Wallet names
+
+Owned wallets may have a private user-defined name such as:
+
+```text
+Company treasury
+Operations
+Personal
+```
+
+The name is Krypto121 account metadata only. It does not change the wallet address, provider, ownership verification, signing authority, or blockchain state.
+
+```text
+wallet address
+  |
+  +-- provider / ownership facts
+  +-- user-defined display name
+```
+
+Names are stored server-side in `wallet_labels` and keyed by the authenticated Privy user plus wallet address.
+
+The custom name is reused consistently in:
+
+- My wallets
+- Send source selection
+- Receive destination selection
+
+Watch-only wallets keep their existing label from `watch_wallets`.

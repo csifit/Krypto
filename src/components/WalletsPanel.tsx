@@ -30,6 +30,8 @@ type WalletRow = {
   canPay: boolean;
   needsConnect: boolean;
   watchWalletId?: string;
+  defaultLabel: string;
+  renameable: boolean;
 };
 
 export default function WalletsPanel({
@@ -44,8 +46,11 @@ export default function WalletsPanel({
   onAddWatch,
   onRemoveWatch,
   onConnectExternal,
+  walletLabels,
   onRefreshBalances,
   onMakePayment,
+  onRenameWallet,
+  onResetWalletName,
 }: {
   embeddedAddress?: `0x${string}`;
   linkedWallets: LinkedWalletView[];
@@ -54,12 +59,15 @@ export default function WalletsPanel({
   balancesLoading: boolean;
   loading: boolean;
   linkStatus?: string | null;
+  walletLabels: Record<string, string>;
   onLinkExternal(): void;
   onAddWatch(label: string, address: `0x${string}`): Promise<void>;
   onRemoveWatch(id: string): Promise<void>;
   onConnectExternal(): void;
   onRefreshBalances(): Promise<void>;
   onMakePayment(address: `0x${string}`): void;
+  onRenameWallet(address: `0x${string}`, label: string): Promise<void>;
+  onResetWalletName(address: `0x${string}`): Promise<void>;
 }) {
   const [showWatchForm, setShowWatchForm] = useState(false);
   const [label, setLabel] = useState("");
@@ -67,6 +75,10 @@ export default function WalletsPanel({
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+  const [renamingAddress, setRenamingAddress] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
 
   const knownAddresses = useMemo(() => {
     const values = new Set<string>();
@@ -74,15 +86,18 @@ export default function WalletsPanel({
     linkedWallets.forEach((wallet) => values.add(wallet.address.toLowerCase()));
     watchWallets.forEach((wallet) => values.add(wallet.address.toLowerCase()));
     return values;
-  }, [embeddedAddress, linkedWallets, watchWallets]);
+  }, [embeddedAddress, linkedWallets, watchWallets, walletLabels]);
 
   const rows = useMemo<WalletRow[]>(() => {
     const result: WalletRow[] = [];
 
     if (embeddedAddress) {
+      const defaultLabel = "Krypto121 wallet";
       result.push({
         id: `embedded-${embeddedAddress.toLowerCase()}`,
-        label: "Krypto121 wallet",
+        label: walletLabels[embeddedAddress.toLowerCase()] ?? defaultLabel,
+        defaultLabel,
+        renameable: true,
         address: embeddedAddress,
         badge: "Active",
         type: "Krypto121 wallet",
@@ -95,9 +110,12 @@ export default function WalletsPanel({
     }
 
     for (const wallet of linkedWallets) {
+      const defaultLabel = wallet.provider;
       result.push({
         id: `linked-${wallet.address.toLowerCase()}`,
-        label: wallet.provider,
+        label: walletLabels[wallet.address.toLowerCase()] ?? defaultLabel,
+        defaultLabel,
+        renameable: true,
         address: wallet.address,
         badge: "Linked",
         type: "Linked wallet",
@@ -113,6 +131,8 @@ export default function WalletsPanel({
       result.push({
         id: `watch-${wallet.id}`,
         label: wallet.label,
+        defaultLabel: wallet.label,
+        renameable: false,
         address: wallet.address,
         badge: "Watch-only",
         type: "Watch-only wallet",
@@ -126,7 +146,7 @@ export default function WalletsPanel({
     }
 
     return result;
-  }, [embeddedAddress, linkedWallets, watchWallets]);
+  }, [embeddedAddress, linkedWallets, watchWallets, walletLabels]);
 
   async function submitWatch(event: React.FormEvent) {
     event.preventDefault();
@@ -167,6 +187,58 @@ export default function WalletsPanel({
     await navigator.clipboard.writeText(value);
     setCopiedAddress(value.toLowerCase());
     window.setTimeout(() => setCopiedAddress(null), 1400);
+  }
+
+  function startRename(wallet: WalletRow) {
+    setRenamingAddress(wallet.address.toLowerCase());
+    setRenameValue(wallet.label);
+    setRenameError(null);
+  }
+
+  async function saveRename(wallet: WalletRow) {
+    const next = renameValue.trim();
+
+    if (!next) {
+      setRenameError("Enter a wallet name");
+      return;
+    }
+
+    if (next.length > 100) {
+      setRenameError("Wallet name must be 100 characters or less");
+      return;
+    }
+
+    setRenameSaving(true);
+    setRenameError(null);
+
+    try {
+      await onRenameWallet(wallet.address, next);
+      setRenamingAddress(null);
+      setRenameValue("");
+    } catch (error) {
+      setRenameError(
+        error instanceof Error ? error.message : "Could not save wallet name",
+      );
+    } finally {
+      setRenameSaving(false);
+    }
+  }
+
+  async function resetRename(wallet: WalletRow) {
+    setRenameSaving(true);
+    setRenameError(null);
+
+    try {
+      await onResetWalletName(wallet.address);
+      setRenamingAddress(null);
+      setRenameValue("");
+    } catch (error) {
+      setRenameError(
+        error instanceof Error ? error.message : "Could not reset wallet name",
+      );
+    } finally {
+      setRenameSaving(false);
+    }
   }
 
   return (
@@ -263,6 +335,68 @@ export default function WalletsPanel({
               </summary>
 
               <div className="walletAccordionBody">
+                {wallet.renameable ? (
+                  <div className="walletNameSection">
+                    <div>
+                      <span>Wallet name</span>
+                      <strong>{wallet.label}</strong>
+                    </div>
+
+                    {renamingAddress === wallet.address.toLowerCase() ? (
+                      <div className="walletRenameForm">
+                        <input
+                          value={renameValue}
+                          onChange={(event) => setRenameValue(event.target.value)}
+                          maxLength={100}
+                          placeholder={wallet.defaultLabel}
+                          aria-label="Wallet name"
+                        />
+                        <button
+                          className="primaryButton"
+                          type="button"
+                          disabled={renameSaving}
+                          onClick={() => void saveRename(wallet)}
+                        >
+                          {renameSaving ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          className="secondaryButton"
+                          type="button"
+                          disabled={renameSaving}
+                          onClick={() => {
+                            setRenamingAddress(null);
+                            setRenameError(null);
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        {wallet.label !== wallet.defaultLabel ? (
+                          <button
+                            className="textButton"
+                            type="button"
+                            disabled={renameSaving}
+                            onClick={() => void resetRename(wallet)}
+                          >
+                            Use default name
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <button
+                        className="textButton walletRenameButton"
+                        type="button"
+                        onClick={() => startRename(wallet)}
+                      >
+                        Rename
+                      </button>
+                    )}
+
+                    {renamingAddress === wallet.address.toLowerCase() && renameError ? (
+                      <p className="errorText walletRenameError">{renameError}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <div className="walletDetailGrid">
                   <div>
                     <span>Wallet type</span>

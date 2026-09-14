@@ -17,6 +17,7 @@ import {
   createBeneficiary,
   deleteBeneficiary,
   listBeneficiaries,
+  listWalletLabels,
   syncProfile,
 } from "@/lib/backend/client";
 import type { Beneficiary } from "@/lib/payments/types";
@@ -66,6 +67,7 @@ export default function WalletDashboard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SecondarySection>(null);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [walletLabels, setWalletLabels] = useState<Record<string, string>>({});
   const [beneficiariesLoading, setBeneficiariesLoading] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
@@ -139,7 +141,8 @@ export default function WalletDashboard({
     if (embeddedWallet?.address) {
       sources.push({
         id: `embedded-${embeddedWallet.address.toLowerCase()}`,
-        label: "Krypto121 wallet",
+        label:
+          walletLabels[embeddedWallet.address.toLowerCase()] ?? "Krypto121 wallet",
         provider: "Privy",
         embedded: true,
         wallet: createPrivyWalletProvider(embeddedWallet, celoSepolia.id),
@@ -156,7 +159,7 @@ export default function WalletDashboard({
 
       sources.push({
         id: `linked-${linked.address.toLowerCase()}`,
-        label: linked.provider,
+        label: walletLabels[linked.address.toLowerCase()] ?? linked.provider,
         provider: linked.provider,
         embedded: false,
         wallet: createPrivyWalletProvider(connected, celoSepolia.id),
@@ -164,7 +167,7 @@ export default function WalletDashboard({
     }
 
     return sources;
-  }, [embeddedWallet, linkedWallets, wallets]);
+  }, [embeddedWallet, linkedWallets, wallets, walletLabels]);
 
   const ownedWalletAddresses = useMemo<`0x${string}`[]>(() => {
     const addresses: `0x${string}`[] = [];
@@ -175,7 +178,7 @@ export default function WalletDashboard({
       (address, index, all) =>
         all.findIndex((candidate) => candidate.toLowerCase() === address.toLowerCase()) === index,
     );
-  }, [embeddedWallet?.address, linkedWallets]);
+  }, [embeddedWallet?.address, linkedWallets, walletLabels]);
 
   const portfolio = useWalletPortfolio(ownedWalletAddresses);
 
@@ -197,7 +200,8 @@ export default function WalletDashboard({
     if (embeddedWallet?.address) {
       options.push({
         id: `embedded-${embeddedWallet.address.toLowerCase()}`,
-        label: "Krypto121 wallet",
+        label:
+          walletLabels[embeddedWallet.address.toLowerCase()] ?? "Krypto121 wallet",
         address: embeddedWallet.address as `0x${string}`,
         detail: "Krypto121 wallet",
       });
@@ -206,20 +210,21 @@ export default function WalletDashboard({
     for (const wallet of linkedWallets) {
       options.push({
         id: `linked-${wallet.address.toLowerCase()}`,
-        label: wallet.provider,
+        label: walletLabels[wallet.address.toLowerCase()] ?? wallet.provider,
         address: wallet.address,
         detail: "Linked wallet",
       });
     }
 
     return options;
-  }, [embeddedWallet?.address, linkedWallets]);
+  }, [embeddedWallet?.address, linkedWallets, walletLabels]);
 
   useEffect(() => {
     const walletAddress = walletProvider?.address;
 
     if (!walletAddress) {
       setBeneficiaries([]);
+      setWalletLabels({});
       return;
     }
 
@@ -232,10 +237,18 @@ export default function WalletDashboard({
       try {
         await syncProfile(getAccessToken, address);
 
-        const nextBeneficiaries = await listBeneficiaries(getAccessToken);
+        const [nextBeneficiaries, nextWalletLabels] = await Promise.all([
+          listBeneficiaries(getAccessToken),
+          listWalletLabels(getAccessToken),
+        ]);
 
         if (!cancelled) {
           setBeneficiaries(nextBeneficiaries);
+          const labelMap: Record<string, string> = {};
+          for (const item of nextWalletLabels) {
+            labelMap[item.address.toLowerCase()] = item.label;
+          }
+          setWalletLabels(labelMap);
         }
       } catch (error) {
         if (!cancelled) {

@@ -10,11 +10,14 @@ import WalletsPanel from "@/components/WalletsPanel";
 import { useWalletPortfolio } from "@/hooks/useWalletPortfolio";
 import {
   createWatchWallet,
+  deleteWalletLabel,
   deleteWatchWallet,
+  listWalletLabels,
   listWatchWallets,
+  saveWalletLabel,
   syncProfile,
 } from "@/lib/backend/client";
-import type { LinkedWalletView, WatchWallet } from "@/lib/wallet/directory";
+import type { LinkedWalletView, WalletLabel, WatchWallet } from "@/lib/wallet/directory";
 
 function formatBalance(value: number) {
   return value.toLocaleString(undefined, {
@@ -43,6 +46,7 @@ export default function MyWalletsPage() {
   const { wallets, ready: walletsReady } = useWallets();
   const [menuOpen, setMenuOpen] = useState(false);
   const [watchWallets, setWatchWallets] = useState<WatchWallet[]>([]);
+  const [walletLabels, setWalletLabels] = useState<WalletLabel[]>([]);
   const [loading, setLoading] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [linkStatus, setLinkStatus] = useState<string | null>(null);
@@ -113,6 +117,7 @@ export default function MyWalletsPage() {
   useEffect(() => {
     if (!embeddedAddress) {
       setWatchWallets([]);
+      setWalletLabels([]);
       return;
     }
 
@@ -123,8 +128,14 @@ export default function MyWalletsPage() {
     void (async () => {
       try {
         await syncProfile(getAccessToken, embeddedAddress);
-        const next = await listWatchWallets(getAccessToken);
-        if (!cancelled) setWatchWallets(next);
+        const [nextWatchWallets, nextWalletLabels] = await Promise.all([
+          listWatchWallets(getAccessToken),
+          listWalletLabels(getAccessToken),
+        ]);
+        if (!cancelled) {
+          setWatchWallets(nextWatchWallets);
+          setWalletLabels(nextWalletLabels);
+        }
       } catch (error) {
         if (!cancelled) {
           setBackendError(
@@ -168,6 +179,32 @@ export default function MyWalletsPage() {
   async function removeWatchWallet(id: string) {
     await deleteWatchWallet(getAccessToken, id);
     setWatchWallets((current) => current.filter((wallet) => wallet.id !== id));
+  }
+
+  const walletLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const item of walletLabels) {
+      map[item.address.toLowerCase()] = item.label;
+    }
+    return map;
+  }, [walletLabels]);
+
+  async function renameWallet(address: `0x${string}`, label: string) {
+    const saved = await saveWalletLabel(getAccessToken, { address, label });
+    setWalletLabels((current) => {
+      const key = address.toLowerCase();
+      return [
+        ...current.filter((item) => item.address.toLowerCase() !== key),
+        saved,
+      ];
+    });
+  }
+
+  async function resetWalletName(address: `0x${string}`) {
+    await deleteWalletLabel(getAccessToken, address);
+    setWalletLabels((current) =>
+      current.filter((item) => item.address.toLowerCase() !== address.toLowerCase()),
+    );
   }
 
   function makePayment(address: `0x${string}`) {
@@ -256,8 +293,11 @@ export default function MyWalletsPage() {
             onConnectExternal={connectExternalWallet}
             onAddWatch={addWatchWallet}
             onRemoveWatch={removeWatchWallet}
+            walletLabels={walletLabelMap}
             onRefreshBalances={portfolio.refresh}
             onMakePayment={makePayment}
+            onRenameWallet={renameWallet}
+            onResetWalletName={resetWalletName}
           />
         </div>
       </main>

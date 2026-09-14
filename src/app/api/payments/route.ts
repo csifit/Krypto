@@ -70,10 +70,9 @@ export async function POST(request: Request) {
     }
     if (
       !isAddress(record.intent.sourceWallet) ||
-      !isAddress(record.intent.destination) ||
-      record.intent.sourceWallet.toLowerCase() !== body.walletAddress.toLowerCase()
+      !isAddress(record.intent.destination)
     ) {
-      return Response.json({ error: "Payment wallet mismatch" }, { status: 400 });
+      return Response.json({ error: "Invalid payment wallet" }, { status: 400 });
     }
 
     await ensureProfile(userId, body.walletAddress);

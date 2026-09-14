@@ -4,65 +4,48 @@
 
 Krypto121 is currently a testnet, business-first stablecoin payments application.
 
-## v0.7 — My wallets
+## v0.8 — Choose payment source
 
-v0.7 introduces the first wallet directory without changing the tested payment flow.
+v0.8 lets a user create a `PaymentIntent` from either:
 
-### Wallet types
+- the Krypto121 embedded wallet; or
+- a linked external EVM wallet that is currently connected and able to sign.
 
-- **Krypto121 wallet** — the existing Privy embedded wallet used by the current Send / Receive flow.
-- **Linked wallet** — an external wallet the user connects and verifies ownership of through Privy.
-- **Watch-only wallet** — an address saved in Krypto121 for monitoring; it can never sign or move funds.
+Watch-only wallets remain view-only and can never become a payment source.
 
-Linked external wallets are tied to the Privy user account. Watch-only wallet records are stored in Supabase.
+### Payment flow
 
-Krypto121 never asks users to paste a seed phrase or private key.
+```text
+Connected source wallet
+        ↓
+PaymentIntent
+        ↓
+Krypto121 route / quote
+        ↓
+User approves in the selected wallet
+        ↓
+Celo Sepolia
+        ↓
+Payment history
+```
+
+The router still returns the simple direct Celo test route. The important change is that the source wallet is now part of the payment intent rather than being hard-wired to the embedded wallet.
 
 ## What stays unchanged
 
 - Celo Sepolia development network
 - USDTd test token
-- user-authorized payment signing
+- Privy authentication and wallet linking
+- Supabase persistence
+- beneficiaries and payment history
 - PaymentIntent -> Quote -> Route boundary
-- beneficiaries and payment history persistence
 - simple dashboard: My wallet, Balance, Send / Receive
 - optional dark mode
+- future Privy -> custom Krypto121 MPC direction
 
-The current Send flow still uses the Krypto121 embedded wallet as its source. Selecting another linked wallet as the payment source comes in a later milestone.
+## Upgrade from v0.7
 
-## Upgrade from v0.6
-
-### 1. Apply migration 002
-
-Run this file in the krypto121 Supabase SQL Editor:
-
-```text
-supabase/migrations/202609140002_watch_wallets.sql
-```
-
-It adds only:
-
-```text
-watch_wallets
-```
-
-Migration 001 remains unchanged.
-
-### 2. Environment variables
-
-No new environment variables are required.
-
-Keep:
-
-```env
-NEXT_PUBLIC_PRIVY_APP_ID=...
-PRIVY_APP_SECRET=...
-NEXT_PUBLIC_KRYPTO_NETWORK=testnet
-SUPABASE_URL=https://yueskxkbwlanxcqntpsi.supabase.co
-SUPABASE_SECRET_KEY=sb_secret_...
-```
-
-### 3. Install / build
+No database migration and no new environment variables are required.
 
 ```bash
 npm install
@@ -70,17 +53,23 @@ npm run build
 npm run dev
 ```
 
-## v0.7 acceptance test
+## v0.8 acceptance test
 
-1. Sign in with the existing Krypto121 account.
-2. Confirm the normal dashboard still has only My wallet, Balance, and Send / Receive.
-3. Open **My wallets** from the sidebar.
-4. Confirm the Krypto121 embedded wallet appears as Active.
-5. Click **Link existing wallet**, connect an external EVM wallet, and approve the ownership signature.
-6. Confirm the wallet appears as Linked.
-7. Add a separate EVM address as **watch-only**.
-8. Refresh or sign in on another browser and confirm the watch-only address remains.
-9. Remove the watch-only wallet and confirm it disappears.
-10. Send a normal USDTd test payment from the Krypto121 wallet and confirm the existing payment flow still works.
+1. Sign in to Krypto121.
+2. Open **My wallets**.
+3. Confirm the embedded Krypto121 wallet is available.
+4. Confirm a previously linked external wallet appears.
+5. If it says it is saved but not connected, click **Connect for payment**.
+6. Make sure the external wallet has some USDTd on Celo Sepolia for testing.
+7. Open **Send**.
+8. Confirm **Pay from** lists the Krypto121 wallet plus connected linked wallets.
+9. Select the external wallet.
+10. Confirm Krypto121 reads that wallet's USDTd balance.
+11. Create a small payment, review the quote, and confirm **Pay from** shows the selected external wallet.
+12. Approve the transaction in that external wallet.
+13. Confirm the transaction settles on Celo Sepolia and appears in Payment history with that external source address.
+14. Repeat with the embedded Krypto121 wallet and confirm the original path still works.
 
-See `docs/ARCHITECTURE.md` and `UPGRADE-v0.7.md`.
+Watch-only wallets must never appear in **Pay from**.
+
+See `docs/ARCHITECTURE.md` and `docs/upgrades/UPGRADE-v0.8.md`.

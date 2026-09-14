@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { isAddress } from "viem";
 import { sendTestUsdt } from "@/lib/blockchain/usdt";
+import { useUsdtBalance } from "@/hooks/useUsdtBalance";
 import {
   createDirectCeloIntent,
   quoteDirectCeloIntent,
@@ -14,19 +15,26 @@ import type {
   PaymentIntent,
   PaymentQuote,
 } from "@/lib/payments/types";
-import type { WalletProvider } from "@/lib/wallet/types";
+import type { PaymentSourceWallet } from "@/lib/wallet/types";
+
+function shortAddress(address: string) {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
 
 export default function SendPanel({
-  wallet,
-  balance,
+  accountWalletAddress,
+  sourceWallets,
   beneficiaries,
   onSent,
 }: {
-  wallet: WalletProvider;
-  balance: string;
+  accountWalletAddress: `0x${string}`;
+  sourceWallets: PaymentSourceWallet[];
   beneficiaries: Beneficiary[];
   onSent(): Promise<void>;
 }) {
+  const [sourceId, setSourceId] = useState(
+    sourceWallets[0]?.id ?? "",
+  );
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
@@ -40,6 +48,11 @@ export default function SendPanel({
   const [recordWarning, setRecordWarning] = useState<string | null>(null);
   const { getAccessToken } = usePrivy();
 
+  const selectedSource =
+    sourceWallets.find((source) => source.id === sourceId) ?? sourceWallets[0];
+
+  const sourceBalance = useUsdtBalance(selectedSource?.wallet.address);
+
   const selectedBeneficiary = beneficiaries.find(
     (item) => item.address.toLowerCase() === recipient.toLowerCase(),
   );
@@ -52,9 +65,11 @@ export default function SendPanel({
     if (!Number.isFinite(number) || number <= 0) {
       return "Amount must be greater than zero";
     }
-    if (number > Number(balance)) return "Amount exceeds your test balance";
+    if (number > Number(sourceBalance.balance)) {
+      return "Amount exceeds the selected wallet balance";
+    }
     return null;
-  }, [recipient, amount, balance]);
+  }, [recipient, amount, sourceBalance.balance]);
 
   function selectBeneficiary(value: string) {
     if (!value) return;
@@ -64,6 +79,14 @@ export default function SendPanel({
   function review() {
     setError(null);
 
+    if (!selectedSource) {
+      setError("Connect a wallet before creating a payment");
+      return;
+    }
+    if (sourceBalance.loading) {
+      setError("Wait for the selected wallet balance to load");
+      return;
+    }
     if (!recipient || !amount) {
       setError("Enter a recipient and amount");
       return;
@@ -75,7 +98,7 @@ export default function SendPanel({
 
     try {
       const nextIntent = createDirectCeloIntent({
-        sourceWallet: wallet.address,
+        sourceWallet: selectedSource.wallet.address,
         destination: recipient,
         amount,
         memo,
@@ -99,12 +122,27 @@ export default function SendPanel({
       return;
     }
 
+    const executionSource = sourceWallets.find(
+      (source) =>
+        source.wallet.address.toLowerCase() === intent.sourceWallet.toLowerCase(),
+    );
+
+    if (!executionSource) {
+      setError("The selected source wallet is no longer connected. Connect it again and review the payment.");
+      setStage("form");
+      return;
+    }
+
     setStage("sending");
     setError(null);
 
     try {
       intent.status = "executing";
-      const txHash = await sendTestUsdt(wallet, intent.destination, intent.sourceAmount);
+      const txHash = await sendTestUsdt(
+        executionSource.wallet,
+        intent.destination,
+        intent.sourceAmount,
+      );
       intent.status = "settled";
 
       const record = {
@@ -118,7 +156,7 @@ export default function SendPanel({
       };
 
       try {
-        await savePaymentRecord(getAccessToken, wallet.address, record);
+        await savePaymentRecord(getAccessToken, accountWalletAddress, record);
       } catch (syncError) {
         setRecordWarning(
           syncError instanceof Error
@@ -129,7 +167,7 @@ export default function SendPanel({
 
       setHash(txHash);
       setStage("success");
-      await onSent();
+      await Promise.all([sourceBalance.refresh(), onSent()]);
     } catch (err) {
       intent.status = "failed";
       setStage("review");
@@ -149,6 +187,12 @@ export default function SendPanel({
     setStage("form");
   }
 
+  const intentSource = intent
+    ? sourceWallets.find(
+        (source) => source.wallet.address.toLowerCase() === intent.sourceWallet.toLowerCase(),
+      )
+    : undefined;
+
   if (stage === "success" && hash && intent) {
     return (
       <section className="sendPanel">
@@ -157,6 +201,9 @@ export default function SendPanel({
         <p>
           {intent.sourceAmount} USDTd was confirmed on Celo Sepolia through the
           direct Krypto121 route. No real money was used.
+        </p>
+        <p className="hint">
+          From: {intentSource?.label ?? shortAddress(intent.sourceWallet)}
         </p>
         {intent.memo ? <p className="hint">Memo: {intent.memo}</p> : null}
         {recordWarning ? <p className="errorText">{recordWarning}</p> : null}
@@ -186,6 +233,12 @@ export default function SendPanel({
 
         <div className="reviewRows">
           <div>
+            <span>Pay from</span>
+            <strong>
+              {intentSource?.label ?? shortAddress(intent.sourceWallet)} · {shortAddress(intent.sourceWallet)}
+            </strong>
+          </div>
+          <div>
             <span>Recipient</span>
             <strong className="breakWord">
               {selectedBeneficiary?.name ?? intent.destination}
@@ -212,8 +265,7 @@ export default function SendPanel({
         </div>
 
         <p className="hint">
-          This is Krypto121&apos;s first route: a direct same-chain transfer. Future
-          quotes can replace it with swap, bridge, off-ramp, FX, or CBDC steps.
+          Krypto121 creates the route, but the selected source wallet must approve the transaction.
         </p>
 
         {error ? <p className="errorText">{error}</p> : null}
@@ -242,6 +294,27 @@ export default function SendPanel({
     <section className="sendPanel">
       <p className="eyebrow">Create payment intent</p>
       <h2>New payment</h2>
+
+      <label className="field">
+        <span>Pay from</span>
+        <select
+          value={selectedSource?.id ?? ""}
+          onChange={(event) => {
+            setSourceId(event.target.value);
+            setError(null);
+          }}
+        >
+          {sourceWallets.map((source) => (
+            <option key={source.id} value={source.id}>
+              {source.label} · {shortAddress(source.wallet.address)}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <p className="hint">
+        Only connected wallets that can sign are listed. Watch-only wallets can never be a payment source.
+      </p>
 
       {beneficiaries.length ? (
         <label className="field">
@@ -290,12 +363,15 @@ export default function SendPanel({
         />
       </label>
 
-      <p className="hint">Available: {balance} USDTd</p>
+      <p className="hint">
+        Available in selected wallet: {sourceBalance.loading ? "…" : sourceBalance.balance} USDTd
+      </p>
+      {sourceBalance.error ? <p className="errorText">{sourceBalance.error}</p> : null}
       {validationError ? <p className="errorText">{validationError}</p> : null}
       {error ? <p className="errorText">{error}</p> : null}
 
       <div className="actions">
-        <button className="primaryButton" onClick={review}>
+        <button className="primaryButton" onClick={review} disabled={!selectedSource}>
           Get route & review
         </button>
       </div>

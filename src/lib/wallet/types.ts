@@ -14,3 +14,11 @@ export interface WalletProvider {
   switchChain(chainId: number): Promise<void>;
   getEip1193Provider(): Promise<Eip1193Provider>;
 }
+
+export interface PaymentSourceWallet {
+  id: string;
+  label: string;
+  provider: string;
+  embedded: boolean;
+  wallet: WalletProvider;
+}

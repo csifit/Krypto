@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useLinkAccount, usePrivy, useWallets } from "@privy-io/react-auth";
+import { useConnectWallet, useLinkAccount, usePrivy, useWallets } from "@privy-io/react-auth";
 import { isAddress } from "viem";
 import BeneficiariesPanel from "@/components/BeneficiariesPanel";
 import DashboardSidebar, { type SecondarySection } from "@/components/DashboardSidebar";
@@ -26,6 +26,7 @@ import {
 import type { Beneficiary } from "@/lib/payments/types";
 import type { LinkedWalletView, WatchWallet } from "@/lib/wallet/directory";
 import { createPrivyWalletProvider } from "@/lib/wallet/privy";
+import type { PaymentSourceWallet } from "@/lib/wallet/types";
 
 function shortAddress(address?: string) {
   if (!address) return "Not created yet";
@@ -80,6 +81,8 @@ export default function WalletDashboard() {
     },
   });
 
+  const { connectWallet } = useConnectWallet();
+
   const embeddedWallet = wallets.find(
     (wallet) => wallet.walletClientType === "privy",
   );
@@ -115,6 +118,39 @@ export default function WalletDashboard() {
     if (!embeddedWallet?.address) return undefined;
     return createPrivyWalletProvider(embeddedWallet, celoSepolia.id);
   }, [embeddedWallet]);
+
+  const paymentSources = useMemo<PaymentSourceWallet[]>(() => {
+    const sources: PaymentSourceWallet[] = [];
+
+    if (embeddedWallet?.address) {
+      sources.push({
+        id: `embedded-${embeddedWallet.address.toLowerCase()}`,
+        label: "Krypto121 wallet",
+        provider: "Privy",
+        embedded: true,
+        wallet: createPrivyWalletProvider(embeddedWallet, celoSepolia.id),
+      });
+    }
+
+    for (const linked of linkedWallets) {
+      if (!linked.connected) continue;
+
+      const connected = wallets.find(
+        (wallet) => wallet.address.toLowerCase() === linked.address.toLowerCase(),
+      );
+      if (!connected) continue;
+
+      sources.push({
+        id: `linked-${linked.address.toLowerCase()}`,
+        label: linked.provider,
+        provider: linked.provider,
+        embedded: false,
+        wallet: createPrivyWalletProvider(connected, celoSepolia.id),
+      });
+    }
+
+    return sources;
+  }, [embeddedWallet, linkedWallets, wallets]);
 
   const usdt = useUsdtBalance(walletProvider?.address);
   const celo = useCeloBalance(walletProvider?.address);
@@ -198,6 +234,11 @@ export default function WalletDashboard() {
   function linkExternalWallet() {
     setWalletLinkStatus("Connect and verify the wallet you want to add.");
     linkWallet();
+  }
+
+  function connectExternalWallet() {
+    setWalletLinkStatus("Connect a linked wallet to use it for payments in this session.");
+    connectWallet();
   }
 
   async function refreshAll() {
@@ -353,8 +394,8 @@ export default function WalletDashboard() {
 
             {showSend && walletProvider ? (
               <SendPanel
-                wallet={walletProvider}
-                balance={usdt.balance}
+                accountWalletAddress={walletProvider.address}
+                sourceWallets={paymentSources}
                 beneficiaries={beneficiaries}
                 onSent={refreshAll}
               />
@@ -381,6 +422,7 @@ export default function WalletDashboard() {
                   loading={walletsLoading}
                   linkStatus={walletLinkStatus}
                   onLinkExternal={linkExternalWallet}
+                  onConnectExternal={connectExternalWallet}
                   onAddWatch={addWatchWallet}
                   onRemoveWatch={removeWatchWallet}
                 />

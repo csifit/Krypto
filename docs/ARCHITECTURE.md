@@ -260,3 +260,38 @@ Security review, monitoring, production RPC, compliance boundaries, and mainnet 
 > The user controls the wallet.  
 > The blockchain records stablecoin ownership and settlement.  
 > The router decides how a payment should settle.
+
+## v0.8 — Payment source selection
+
+A Krypto121 account is not the same thing as one wallet.
+
+```text
+Krypto121 account
+  |
+  +-- embedded wallet
+  +-- linked external wallet
+  +-- linked external wallet
+  +-- watch-only wallet
+```
+
+A `PaymentIntent` explicitly records `sourceWallet`.
+
+Only a wallet that is currently connected and capable of signing may be selected as a source. Watch-only wallets are never eligible.
+
+```text
+Selected signing wallet
+        |
+        v
+PaymentIntent.sourceWallet
+        |
+        v
+Route / Quote
+        |
+        v
+Selected wallet approves
+        |
+        v
+Settlement
+```
+
+This keeps the routing layer independent of the wallet provider and preserves the future migration from Privy to custom Krypto121 MPC infrastructure.

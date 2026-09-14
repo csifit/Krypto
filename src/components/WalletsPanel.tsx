@@ -17,6 +17,7 @@ export default function WalletsPanel({
   onLinkExternal,
   onAddWatch,
   onRemoveWatch,
+  onConnectExternal,
 }: {
   embeddedAddress?: `0x${string}`;
   linkedWallets: LinkedWalletView[];
@@ -26,6 +27,7 @@ export default function WalletsPanel({
   onLinkExternal(): void;
   onAddWatch(label: string, address: `0x${string}`): Promise<void>;
   onRemoveWatch(id: string): Promise<void>;
+  onConnectExternal(): void;
 }) {
   const [showWatchForm, setShowWatchForm] = useState(false);
   const [label, setLabel] = useState("");
@@ -172,7 +174,13 @@ export default function WalletsPanel({
             </div>
             <div className="walletListMeta">
               <span>Ownership verified</span>
-              <span>{wallet.connected ? "Connected now" : "Saved to account"}</span>
+              {wallet.connected ? (
+                <span>Connected now</span>
+              ) : (
+                <button className="textButton" onClick={onConnectExternal}>
+                  Connect for payment
+                </button>
+              )}
             </div>
           </article>
         ))}

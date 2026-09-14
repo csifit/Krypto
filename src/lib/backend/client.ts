@@ -88,12 +88,12 @@ export async function listPayments(getAccessToken: AccessTokenGetter) {
 
 export async function savePaymentRecord(
   getAccessToken: AccessTokenGetter,
-  walletAddress: `0x${string}`,
+  accountWalletAddress: `0x${string}`,
   record: LocalPaymentRecord,
 ) {
   await authedRequest<{ ok: true }>(getAccessToken, "/api/payments", {
     method: "POST",
-    body: JSON.stringify({ walletAddress, record }),
+    body: JSON.stringify({ walletAddress: accountWalletAddress, record }),
   });
 }
 

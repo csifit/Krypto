@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { useLinkAccount, usePrivy, useWallets } from "@privy-io/react-auth";
+import { isAddress } from "viem";
 import BeneficiariesPanel from "@/components/BeneficiariesPanel";
 import DashboardSidebar, { type SecondarySection } from "@/components/DashboardSidebar";
 import PaymentHistory from "@/components/PaymentHistory";
@@ -9,16 +10,21 @@ import ReceivePanel from "@/components/ReceivePanel";
 import SendPanel from "@/components/SendPanel";
 import TestFundsPanel from "@/components/TestFundsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
+import WalletsPanel from "@/components/WalletsPanel";
 import { useCeloBalance } from "@/hooks/useCeloBalance";
 import { useUsdtBalance } from "@/hooks/useUsdtBalance";
 import { celoSepolia } from "@/lib/celo";
 import {
   createBeneficiary,
+  createWatchWallet,
   deleteBeneficiary,
+  deleteWatchWallet,
   listBeneficiaries,
+  listWatchWallets,
   syncProfile,
 } from "@/lib/backend/client";
 import type { Beneficiary } from "@/lib/payments/types";
+import type { LinkedWalletView, WatchWallet } from "@/lib/wallet/directory";
 import { createPrivyWalletProvider } from "@/lib/wallet/privy";
 
 function shortAddress(address?: string) {
@@ -35,6 +41,20 @@ function formatBalance(value: string) {
   });
 }
 
+type LinkedWalletAccountLike = {
+  type?: string;
+  address?: string;
+  walletClientType?: string;
+  connectorType?: string;
+};
+
+function displayProvider(value?: string) {
+  if (!value || value === "privy") return "External wallet";
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 export default function WalletDashboard() {
   const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
@@ -43,14 +63,53 @@ export default function WalletDashboard() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SecondarySection>(null);
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [watchWallets, setWatchWallets] = useState<WatchWallet[]>([]);
   const [beneficiariesLoading, setBeneficiariesLoading] = useState(false);
+  const [walletsLoading, setWalletsLoading] = useState(false);
+  const [walletLinkStatus, setWalletLinkStatus] = useState<string | null>(null);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [copied, setCopied] = useState(false);
 
+  const { linkWallet } = useLinkAccount({
+    onSuccess: () => {
+      setWalletLinkStatus("Wallet linked to your Krypto121 account.");
+    },
+    onError: (error) => {
+      setWalletLinkStatus(error || "Could not link wallet");
+    },
+  });
+
   const embeddedWallet = wallets.find(
     (wallet) => wallet.walletClientType === "privy",
   );
+
+  const linkedWallets = useMemo<LinkedWalletView[]>(() => {
+    const embeddedAddress = embeddedWallet?.address?.toLowerCase();
+    const connectedByAddress = new Map(
+      wallets.map((wallet) => [wallet.address.toLowerCase(), wallet]),
+    );
+
+    return ((user?.linkedAccounts ?? []) as LinkedWalletAccountLike[])
+      .filter((account) => account.type === "wallet" || account.type === "smart_wallet")
+      .filter((account) => Boolean(account.address) && isAddress(account.address!))
+      .filter((account) => account.address!.toLowerCase() !== embeddedAddress)
+      .map((account) => {
+        const address = account.address as `0x${string}`;
+        const connected = connectedByAddress.get(address.toLowerCase());
+        return {
+          address,
+          provider: displayProvider(
+            connected?.walletClientType || account.walletClientType || account.connectorType,
+          ),
+          connected: Boolean(connected),
+        };
+      })
+      .filter(
+        (wallet, index, all) =>
+          all.findIndex((candidate) => candidate.address.toLowerCase() === wallet.address.toLowerCase()) === index,
+      );
+  }, [embeddedWallet?.address, user?.linkedAccounts, wallets]);
 
   const walletProvider = useMemo(() => {
     if (!embeddedWallet?.address) return undefined;
@@ -65,6 +124,7 @@ export default function WalletDashboard() {
 
     if (!walletAddress) {
       setBeneficiaries([]);
+      setWatchWallets([]);
       return;
     }
 
@@ -72,27 +132,33 @@ export default function WalletDashboard() {
 
     async function loadBackend(address: `0x${string}`) {
       setBeneficiariesLoading(true);
+      setWalletsLoading(true);
       setBackendError(null);
 
       try {
         await syncProfile(getAccessToken, address);
 
-        const next = await listBeneficiaries(getAccessToken);
+        const [nextBeneficiaries, nextWatchWallets] = await Promise.all([
+          listBeneficiaries(getAccessToken),
+          listWatchWallets(getAccessToken),
+        ]);
 
         if (!cancelled) {
-          setBeneficiaries(next);
+          setBeneficiaries(nextBeneficiaries);
+          setWatchWallets(nextWatchWallets);
         }
       } catch (error) {
         if (!cancelled) {
           setBackendError(
             error instanceof Error
               ? error.message
-              : "Could not connect to Krypto backend",
+              : "Could not connect to Krypto121 backend",
           );
         }
       } finally {
         if (!cancelled) {
           setBeneficiariesLoading(false);
+          setWalletsLoading(false);
         }
       }
     }
@@ -119,6 +185,21 @@ export default function WalletDashboard() {
     setBeneficiaries((current) => current.filter((item) => item.id !== id));
   }
 
+  async function addWatchWallet(label: string, address: `0x${string}`) {
+    const created = await createWatchWallet(getAccessToken, { label, address });
+    setWatchWallets((current) => [...current, created]);
+  }
+
+  async function removeWatchWallet(id: string) {
+    await deleteWatchWallet(getAccessToken, id);
+    setWatchWallets((current) => current.filter((item) => item.id !== id));
+  }
+
+  function linkExternalWallet() {
+    setWalletLinkStatus("Connect and verify the wallet you want to add.");
+    linkWallet();
+  }
+
   async function refreshAll() {
     await Promise.all([usdt.refresh(), celo.refresh()]);
     setHistoryRefreshKey((value) => value + 1);
@@ -135,7 +216,7 @@ export default function WalletDashboard() {
     return (
       <main className="shell">
         <section className="panel">
-          <p>Loading Krypto…</p>
+          <p>Loading Krypto121…</p>
         </section>
       </main>
     );
@@ -145,24 +226,24 @@ export default function WalletDashboard() {
     return (
       <main className="landingShell">
         <header className="landingHeader">
-          <strong>Krypto</strong>
+          <strong>Krypto121</strong>
           <ThemeToggle compact />
         </header>
 
         <section className="landingHero">
-          <p className="eyebrow">Krypto Business</p>
-          <h1>One wallet. Smarter global payments.</h1>
+          <p className="eyebrow">Krypto121</p>
+          <h1>Krypto121 is a smart payment-routing wallet.</h1>
           <p className="landingLead">
-            Krypto finds the route. You approve the payment. Your funds stay under your control.
+            Create a wallet or bring the wallets you already use. Manage them from one place.
           </p>
           <button className="primaryButton landingCta" onClick={login}>
             Create account/Log in
           </button>
 
-          <div className="advantageStrip" aria-label="Why Krypto">
-            <span><strong>You control funds.</strong> Non-custodial wallet.</span>
-            <span><strong>Krypto finds the route.</strong> Less payment complexity.</span>
-            <span><strong>Costs are clear.</strong> Review before approval.</span>
+          <div className="advantageStrip" aria-label="Why Krypto121">
+            <span><strong>Your wallets.</strong> One dashboard.</span>
+            <span><strong>Smart routing.</strong> Krypto121 finds the path.</span>
+            <span><strong>You approve.</strong> Funds stay under your control.</span>
           </div>
         </section>
       </main>
@@ -191,7 +272,7 @@ export default function WalletDashboard() {
             <span />
             <span />
           </button>
-          <strong>Krypto</strong>
+          <strong>Krypto121</strong>
           <ThemeToggle compact />
         </header>
 
@@ -199,7 +280,7 @@ export default function WalletDashboard() {
           <div className="dashboardPrimary">
             <header className="dashboardHeading">
               <div>
-                <p className="eyebrow">Krypto Business · Development</p>
+                <p className="eyebrow">Krypto121 · Development</p>
                 <h1 className="dashboardTitle">Overview</h1>
               </div>
             </header>
@@ -291,6 +372,19 @@ export default function WalletDashboard() {
                   Close
                 </button>
               </div>
+
+              {activeSection === "wallets" ? (
+                <WalletsPanel
+                  embeddedAddress={walletProvider?.address}
+                  linkedWallets={linkedWallets}
+                  watchWallets={watchWallets}
+                  loading={walletsLoading}
+                  linkStatus={walletLinkStatus}
+                  onLinkExternal={linkExternalWallet}
+                  onAddWatch={addWatchWallet}
+                  onRemoveWatch={removeWatchWallet}
+                />
+              ) : null}
 
               {activeSection === "beneficiaries" && walletProvider ? (
                 <BeneficiariesPanel

@@ -2,6 +2,7 @@ import type {
   Beneficiary,
   LocalPaymentRecord,
 } from "@/lib/payments/types";
+import type { WatchWallet } from "@/lib/wallet/directory";
 
 type AccessTokenGetter = () => Promise<string | null>;
 
@@ -27,7 +28,7 @@ async function authedRequest<T>(
   } & T;
 
   if (!response.ok) {
-    throw new Error(body.error || "Krypto backend request failed");
+    throw new Error(body.error || "Krypto121 backend request failed");
   }
 
   return body;
@@ -94,4 +95,39 @@ export async function savePaymentRecord(
     method: "POST",
     body: JSON.stringify({ walletAddress, record }),
   });
+}
+
+
+export async function listWatchWallets(getAccessToken: AccessTokenGetter) {
+  const result = await authedRequest<{ watchWallets: WatchWallet[] }>(
+    getAccessToken,
+    "/api/watch-wallets",
+  );
+  return result.watchWallets;
+}
+
+export async function createWatchWallet(
+  getAccessToken: AccessTokenGetter,
+  input: { label: string; address: `0x${string}` },
+) {
+  const result = await authedRequest<{ watchWallet: WatchWallet }>(
+    getAccessToken,
+    "/api/watch-wallets",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return result.watchWallet;
+}
+
+export async function deleteWatchWallet(
+  getAccessToken: AccessTokenGetter,
+  id: string,
+) {
+  await authedRequest<{ ok: true }>(
+    getAccessToken,
+    `/api/watch-wallets?id=${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
 }

@@ -1,20 +1,20 @@
-# Krypto Architecture
+# Krypto121 Architecture
 
 ## Product boundary
 
-Krypto provides the user experience and payment orchestration without becoming the holder of customer wallet keys.
+Krypto121 provides the user experience and payment orchestration without becoming the holder of customer wallet keys.
 
 ```text
 User
   |
   | authentication
   v
-Krypto Web App
+Krypto121 Web App
   |
   +-- WalletProvider abstraction
   |       |
   |       +-- Privy today
-  |       +-- Krypto MPC later
+  |       +-- Krypto121 MPC later
   |
   +-- Payment Intent
   |       |
@@ -28,27 +28,62 @@ Krypto Web App
 
 ## Wallet abstraction
 
-Krypto application code depends on a Krypto-owned wallet interface rather than directly on Privy wherever practical.
+Krypto121 application code depends on a Krypto121-owned wallet interface rather than directly on Privy wherever practical.
 
 V1:
 
 ```text
-Krypto -> WalletProvider -> Privy -> user wallet
+Krypto121 -> WalletProvider -> Privy -> user wallet
 ```
 
 Long-term target:
 
 ```text
-Krypto -> WalletProvider -> Krypto MPC infrastructure -> user wallet
+Krypto121 -> WalletProvider -> Krypto121 MPC infrastructure -> user wallet
 ```
 
 Custom MPC remains a planned future architecture. It should only be introduced after the product, transaction flows, recovery model, and security model are mature.
+
+
+## Wallet directory in v0.7
+
+Krypto121 account identity is separate from wallet identity. One user may have multiple wallets.
+
+```text
+Krypto121 user
+  |
+  +-- Krypto121 embedded wallet
+  +-- verified linked external wallet
+  +-- verified linked external wallet
+  +-- watch-only wallet
+```
+
+Wallet categories have different trust boundaries:
+
+```text
+Embedded
+  -> user-controlled Privy wallet
+  -> can sign when user authorizes
+
+Linked external
+  -> ownership verified by wallet signature through Privy
+  -> can sign only when that external wallet is connected
+
+Watch-only
+  -> address metadata stored in Supabase
+  -> no ownership claim
+  -> no signing capability
+```
+
+Linked-wallet identity is persisted by Privy as part of the user account. Watch-only addresses are stored by Krypto121 in `watch_wallets`. Krypto121 must never ask a user to provide a seed phrase or raw private key to add a wallet.
+
+The current payment source remains the embedded Krypto121 wallet. A later milestone may let the user select a connected linked wallet as the source of a PaymentIntent.
 
 ## Source of truth
 
 For crypto balances and actual settlement, the blockchain is the source of truth.
 
-Krypto may store business metadata such as beneficiaries, memos, intents, quotes, and user-friendly transaction records. Those records must not invent a token balance independently of Celo.
+Krypto121 may store business metadata such as beneficiaries, memos, intents, quotes, and user-friendly transaction records. Those records must not invent a token balance independently of Celo.
 
 ## v0.4 payment flow
 
@@ -56,10 +91,10 @@ Krypto may store business metadata such as beneficiaries, memos, intents, quotes
 User enters recipient + amount + optional memo
         |
         v
-Krypto creates PaymentIntent
+Krypto121 creates PaymentIntent
         |
         v
-Krypto router creates PaymentQuote
+Krypto121 router creates PaymentQuote
         |
         v
 Quote contains PaymentRoute
@@ -77,7 +112,7 @@ Privy user wallet signs / submits
 Celo Sepolia confirms
         |
         v
-Krypto stores a local settlement record
+Krypto121 stores a local settlement record
 ```
 
 The current route contains one step:
@@ -119,14 +154,14 @@ swap -> bridge -> offramp -> FX -> CBDC payout
 
 ## Durable business records in v0.6
 
-Privy remains the identity provider. Krypto verifies the Privy access token in server-side Next.js API routes, then uses a server-only Supabase secret key.
+Privy remains the identity provider. Krypto121 verifies the Privy access token in server-side Next.js API routes, then uses a server-only Supabase secret key.
 
 ```text
 Browser
   |
   | Privy access token
   v
-Krypto Next.js API
+Krypto121 Next.js API
   |
   | verifies token with Privy
   v
@@ -137,9 +172,10 @@ Supabase (server-only access)
   +-- profiles
   +-- beneficiaries
   +-- payments
+  +-- watch_wallets
 ```
 
-Direct browser access to these tables is intentionally denied. RLS is enabled as defense in depth, while the Krypto API performs the Privy-user authorization check.
+Direct browser access to these tables is intentionally denied. RLS is enabled as defense in depth, while the Krypto121 API performs the Privy-user authorization check.
 
 The database stores business metadata only. Celo remains authoritative for balances and settlement.
 
@@ -198,23 +234,29 @@ User-authorized test stablecoin transfer. Complete.
 Beneficiaries, memo, payment intents, quote, and direct route. Complete.
 
 ### M5 — Durable backend
-Privy-authenticated Krypto API + Supabase persistence for profile, beneficiaries, and settled payment records. **Current.**
+Privy-authenticated Krypto121 API + Supabase persistence for profile, beneficiaries, and settled payment records. Complete.
 
-### M6 — Router expansion
+### M6 — Wallet directory
+Multiple linked wallets plus watch-only wallets. **Current.**
+
+### M7 — Select payment source
+Allow a connected linked wallet to become the source wallet for a PaymentIntent.
+
+### M8 — Router expansion
 Add additional crypto routes only when we have a concrete need/provider.
 
-### M7 — Gas UX
+### M9 — Gas UX
 Hide native-token complexity using the safest supported Celo mechanism.
 
-### M8 — External settlement rails
+### M10 — External settlement rails
 Off-ramp / FX / CBDC integrations through regulated providers.
 
-### M9 — Mainnet preparation
+### M11 — Mainnet preparation
 Security review, monitoring, production RPC, compliance boundaries, and mainnet guardrails.
 
 ## Principle
 
-> Krypto is the interface and orchestration layer.  
+> Krypto121 is the interface and orchestration layer.  
 > The user controls the wallet.  
 > The blockchain records stablecoin ownership and settlement.  
 > The router decides how a payment should settle.

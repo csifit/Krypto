@@ -41,10 +41,10 @@ export default function PaymentHistory({ refreshKey }: { refreshKey: number }) {
 
   return (
     <section className="businessPanel">
-      <p className="eyebrow">Krypto records</p>
+      <p className="eyebrow">Krypto121 records</p>
       <h2>Payment history</h2>
       <p className="muted">
-        Krypto stores the business record. The blockchain remains the source of truth for settlement.
+        Krypto121 stores the business record. The blockchain remains the source of truth for settlement.
       </p>
 
       {loading ? <p className="hint">Loading payments…</p> : null}

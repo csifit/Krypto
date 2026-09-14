@@ -33,7 +33,7 @@ export const CELO_SEPOLIA_TEST_USDT = {
 };
 
 // Official Tether deployment on Celo Sepolia, retained for reference only.
-// Krypto v0.3 does not use it because there is no public faucet we can rely on.
+// Krypto121 v0.3 does not use it because there is no public faucet we can rely on.
 export const CELO_SEPOLIA_TETHER_USDT = {
   symbol: "USD₮",
   name: "Tether USD",

@@ -2,7 +2,7 @@
 
 import ThemeToggle from "@/components/ThemeToggle";
 
-export type SecondarySection = "beneficiaries" | "history" | "developer" | null;
+export type SecondarySection = "wallets" | "beneficiaries" | "history" | "developer" | null;
 
 export default function DashboardSidebar({
   open,
@@ -30,7 +30,7 @@ export default function DashboardSidebar({
       <aside className={`dashboardSidebar${open ? " dashboardSidebarOpen" : ""}`}>
         <div>
           <div className="sidebarBrand">
-            <strong>Krypto</strong>
+            <strong>Krypto121</strong>
             <span>Business</span>
           </div>
 
@@ -40,6 +40,12 @@ export default function DashboardSidebar({
               onClick={() => select(null)}
             >
               Overview
+            </button>
+            <button
+              className={activeSection === "wallets" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}
+              onClick={() => select("wallets")}
+            >
+              My wallets
             </button>
             <button
               className={activeSection === "beneficiaries" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}

@@ -1,4 +1,4 @@
--- Krypto v0.6 durable business metadata.
+-- Krypto121 v0.6 durable business metadata.
 -- Privy remains the authentication provider. Browser clients do not access these
 -- tables directly; authenticated Next.js API routes verify the Privy access token
 -- and then use the server-only Supabase secret key.

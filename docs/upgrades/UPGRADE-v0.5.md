@@ -1,4 +1,4 @@
-# Krypto v0.5 upgrade
+# Krypto121 v0.5 upgrade
 
 v0.5 is a UI simplification release. It does not change the tested payment execution logic.
 

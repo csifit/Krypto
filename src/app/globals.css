@@ -936,3 +936,140 @@ code {
     flex: 1;
   }
 }
+
+/* v0.7 wallet directory */
+.walletDirectory h2 {
+  margin: 4px 0 0;
+  font-size: 26px;
+  letter-spacing: -0.035em;
+}
+
+.walletDirectoryIntro {
+  margin-top: 12px;
+  line-height: 1.55;
+}
+
+.walletDirectoryActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.walletActionStatus {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.watchWalletForm {
+  display: grid;
+  gap: 13px;
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+.watchWalletForm label {
+  display: grid;
+  gap: 7px;
+}
+
+.watchWalletForm label > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.watchWalletForm input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  outline: none;
+  background: var(--surface);
+  padding: 0 13px;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.watchWalletForm input:focus {
+  border-color: var(--foreground);
+}
+
+.walletList {
+  display: grid;
+  gap: 0;
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.walletListItem {
+  display: grid;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+}
+
+.walletListTitleRow,
+.walletListMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.walletListTitleRow strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.walletListAddress {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.walletListMeta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.walletBadge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--soft);
+  padding: 5px 8px;
+  color: var(--foreground);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.walletBadgeQuiet {
+  color: var(--muted);
+}
+
+.walletDirectoryNote {
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 560px) {
+  .walletDirectoryActions .primaryButton,
+  .walletDirectoryActions .secondaryButton {
+    flex: 1;
+  }
+
+  .walletListTitleRow,
+  .walletListMeta {
+    align-items: flex-start;
+  }
+}

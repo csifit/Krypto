@@ -10,11 +10,10 @@ export default function Home() {
       <main className="shell">
         <section className="hero">
           <div>
-            <p className="eyebrow">Krypto · Development</p>
-            <h1>Business payments with digital dollars.</h1>
+            <p className="eyebrow">Krypto121 · Development</p>
+            <h1>Krypto121 is a smart payment-routing wallet.</h1>
             <p className="lead">
-              The first milestone is a user-owned embedded wallet running on
-              Celo Sepolia with test USDT.
+              Create a wallet or bring the wallets you already use. Manage them from one place.
             </p>
           </div>
         </section>

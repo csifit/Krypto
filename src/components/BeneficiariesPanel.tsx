@@ -58,7 +58,7 @@ export default function BeneficiariesPanel({
     <section className="businessPanel">
       <p className="eyebrow">Business</p>
       <h2>Beneficiaries</h2>
-      <p className="muted">Saved securely to your Krypto account.</p>
+      <p className="muted">Saved securely to your Krypto121 account.</p>
 
       {loading ? (
         <p className="hint">Loading beneficiaries…</p>

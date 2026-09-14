@@ -3,7 +3,7 @@ import "./globals.css";
 import Providers from "@/components/Providers";
 
 export const metadata: Metadata = {
-  title: "Krypto",
+  title: "Krypto121",
   description: "Non-custodial stablecoin payments with smart routing.",
 };
 

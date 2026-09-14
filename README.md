@@ -1,61 +1,66 @@
-# Krypto
+# Krypto121
 
-Krypto is a business-first stablecoin payments application.
+**Krypto121 is a smart payment-routing wallet. Create a wallet or bring the wallets you already use. Manage them from one place.**
 
-## v0.6
+Krypto121 is currently a testnet, business-first stablecoin payments application.
 
-v0.6 adds the first durable Krypto backend while keeping the tested wallet and payment flow unchanged.
+## v0.7 — My wallets
 
-### What persists now
+v0.7 introduces the first wallet directory without changing the tested payment flow.
 
-- Krypto profile -> Privy user ID + current embedded wallet address
-- beneficiaries
-- payment intent / quote / route metadata
-- settled transaction hash and memo
+### Wallet types
 
-### What does **not** move into the database
+- **Krypto121 wallet** — the existing Privy embedded wallet used by the current Send / Receive flow.
+- **Linked wallet** — an external wallet the user connects and verifies ownership of through Privy.
+- **Watch-only wallet** — an address saved in Krypto121 for monitoring; it can never sign or move funds.
 
-The blockchain remains the source of truth for:
+Linked external wallets are tied to the Privy user account. Watch-only wallet records are stored in Supabase.
 
-- USDT / USDTd ownership
-- token balance
-- actual settlement
+Krypto121 never asks users to paste a seed phrase or private key.
 
-Supabase stores business metadata, not a fabricated crypto ledger.
+## What stays unchanged
 
-## Authentication boundary
+- Celo Sepolia development network
+- USDTd test token
+- user-authorized payment signing
+- PaymentIntent -> Quote -> Route boundary
+- beneficiaries and payment history persistence
+- simple dashboard: My wallet, Balance, Send / Receive
+- optional dark mode
 
-The browser authenticates with Privy. Every Krypto API request sends the short-lived Privy access token to the Next.js backend. The backend verifies that token with Privy before touching Supabase.
+The current Send flow still uses the Krypto121 embedded wallet as its source. Selecting another linked wallet as the payment source comes in a later milestone.
 
-The browser does **not** receive a Supabase secret key and does not directly query the three v0.6 tables.
+## Upgrade from v0.6
 
-## Setup
+### 1. Apply migration 002
 
-### 1. Apply the database migration
-
-Open the Supabase project SQL Editor and run:
-
-```text
-supabase/migrations/202609140001_krypto_persistence.sql
-```
-
-Project URL:
+Run this file in the krypto121 Supabase SQL Editor:
 
 ```text
-https://yueskxkbwlanxcqntpsi.supabase.co
+supabase/migrations/202609140002_watch_wallets.sql
 ```
+
+It adds only:
+
+```text
+watch_wallets
+```
+
+Migration 001 remains unchanged.
 
 ### 2. Environment variables
 
-Keep the existing variables and add:
+No new environment variables are required.
+
+Keep:
 
 ```env
+NEXT_PUBLIC_PRIVY_APP_ID=...
 PRIVY_APP_SECRET=...
+NEXT_PUBLIC_KRYPTO_NETWORK=testnet
 SUPABASE_URL=https://yueskxkbwlanxcqntpsi.supabase.co
 SUPABASE_SECRET_KEY=sb_secret_...
 ```
-
-`PRIVY_APP_SECRET` and `SUPABASE_SECRET_KEY` are server secrets. Never prefix them with `NEXT_PUBLIC_`.
 
 ### 3. Install / build
 
@@ -65,14 +70,17 @@ npm run build
 npm run dev
 ```
 
-## Acceptance test
+## v0.7 acceptance test
 
-1. Sign in to Krypto.
-2. Add a beneficiary.
-3. Refresh the browser: beneficiary should remain.
-4. Sign into the same account in another browser/device: beneficiary should appear there too.
-5. Send a test USDTd payment.
-6. Open Payment history: payment should appear.
-7. Refresh or use another browser: payment should remain.
+1. Sign in with the existing Krypto121 account.
+2. Confirm the normal dashboard still has only My wallet, Balance, and Send / Receive.
+3. Open **My wallets** from the sidebar.
+4. Confirm the Krypto121 embedded wallet appears as Active.
+5. Click **Link existing wallet**, connect an external EVM wallet, and approve the ownership signature.
+6. Confirm the wallet appears as Linked.
+7. Add a separate EVM address as **watch-only**.
+8. Refresh or sign in on another browser and confirm the watch-only address remains.
+9. Remove the watch-only wallet and confirm it disappears.
+10. Send a normal USDTd test payment from the Krypto121 wallet and confirm the existing payment flow still works.
 
-See `docs/ARCHITECTURE.md` and `UPGRADE-v0.6.md`.
+See `docs/ARCHITECTURE.md` and `UPGRADE-v0.7.md`.

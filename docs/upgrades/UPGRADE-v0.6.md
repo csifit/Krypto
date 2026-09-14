@@ -1,4 +1,4 @@
-# Upgrade to Krypto v0.6
+# Upgrade to Krypto121 v0.6
 
 ## New dependencies
 

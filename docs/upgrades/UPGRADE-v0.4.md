@@ -1,6 +1,6 @@
-# Krypto v0.4 Upgrade
+# Krypto121 v0.4 Upgrade
 
-Replace/add the files in this package over the current Krypto root.
+Replace/add the files in this package over the current Krypto121 root.
 
 ## New files
 

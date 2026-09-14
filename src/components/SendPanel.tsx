@@ -156,7 +156,7 @@ export default function SendPanel({
         <h2>Test payment sent</h2>
         <p>
           {intent.sourceAmount} USDTd was confirmed on Celo Sepolia through the
-          direct Krypto route. No real money was used.
+          direct Krypto121 route. No real money was used.
         </p>
         {intent.memo ? <p className="hint">Memo: {intent.memo}</p> : null}
         {recordWarning ? <p className="errorText">{recordWarning}</p> : null}
@@ -196,7 +196,7 @@ export default function SendPanel({
             <strong>{quote.route.steps[0]?.description}</strong>
           </div>
           <div>
-            <span>Krypto fee</span>
+            <span>Krypto121 fee</span>
             <strong>{quote.route.kryptoFeeAmount} USDTd</strong>
           </div>
           <div>
@@ -212,7 +212,7 @@ export default function SendPanel({
         </div>
 
         <p className="hint">
-          This is Krypto&apos;s first route: a direct same-chain transfer. Future
+          This is Krypto121&apos;s first route: a direct same-chain transfer. Future
           quotes can replace it with swap, bridge, off-ramp, FX, or CBDC steps.
         </p>
 

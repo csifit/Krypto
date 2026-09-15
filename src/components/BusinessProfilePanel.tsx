@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
+import BusinessApiPanel from "@/components/BusinessApiPanel";
 import {
   listBusinessPaymentRequests,
   listPayments,
@@ -54,7 +55,11 @@ export default function BusinessProfilePanel({
     setCountryCode(profile?.countryCode ?? "");
     setBusinessEmail(profile?.businessEmail ?? accountEmail ?? "");
     setDefaultWallet(profile?.defaultReceiveWallet ?? wallets[0]?.address ?? "");
-    setDefaultAsset(profile?.defaultReceiveAsset ?? ACTIVE_STABLECOINS[0]?.symbol ?? "");
+    setDefaultAsset(
+      profile?.defaultReceiveAsset ??
+        ACTIVE_STABLECOINS[0]?.symbol ??
+        "",
+    );
   }, [profile, accountEmail, wallets]);
 
   useEffect(() => {
@@ -67,13 +72,18 @@ export default function BusinessProfilePanel({
           listBusinessPaymentRequests(getAccessToken),
           listPayments(getAccessToken),
         ]);
+
         if (!cancelled) {
           setRequests(nextRequests);
           setPayments(nextPayments);
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not load business activity");
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Could not load business activity",
+          );
         }
       } finally {
         if (!cancelled) setLoadingActivity(false);
@@ -86,11 +96,14 @@ export default function BusinessProfilePanel({
   }, [getAccessToken]);
 
   const pendingCount = useMemo(
-    () => requests.filter((item) => item.status === "pending").length,
+    () =>
+      requests.filter((item) => item.status === "pending").length,
     [requests],
   );
+
   const paidCount = useMemo(
-    () => requests.filter((item) => item.status === "paid").length,
+    () =>
+      requests.filter((item) => item.status === "paid").length,
     [requests],
   );
 
@@ -109,10 +122,15 @@ export default function BusinessProfilePanel({
           : undefined,
         defaultReceiveAsset: defaultAsset || undefined,
       });
+
       onSaved(saved);
       setMessage("Business profile saved.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save business profile");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not save business profile",
+      );
     } finally {
       setSaving(false);
     }
@@ -123,14 +141,17 @@ export default function BusinessProfilePanel({
       <p className="eyebrow">Krypto121 Business</p>
       <h2>Business profile</h2>
       <p className="muted">
-        Your business name is shown on new tracked payment requests. Login identity remains separate.
+        Your business name is shown on new tracked payment
+        requests. Login identity remains separate.
       </p>
 
       <label className="field">
         <span>Business / trading name</span>
         <input
           value={businessName}
-          onChange={(event) => setBusinessName(event.target.value)}
+          onChange={(event) =>
+            setBusinessName(event.target.value)
+          }
           maxLength={120}
           placeholder="Acme SRL"
           disabled={readOnly}
@@ -141,7 +162,9 @@ export default function BusinessProfilePanel({
         <span>Country</span>
         <input
           value={countryCode}
-          onChange={(event) => setCountryCode(event.target.value.toUpperCase())}
+          onChange={(event) =>
+            setCountryCode(event.target.value.toUpperCase())
+          }
           maxLength={2}
           placeholder="RO"
           disabled={readOnly}
@@ -152,7 +175,9 @@ export default function BusinessProfilePanel({
         <span>Business email</span>
         <input
           value={businessEmail}
-          onChange={(event) => setBusinessEmail(event.target.value)}
+          onChange={(event) =>
+            setBusinessEmail(event.target.value)
+          }
           type="email"
           placeholder="payments@example.com"
           disabled={readOnly}
@@ -170,11 +195,16 @@ export default function BusinessProfilePanel({
         <span>Default receive wallet</span>
         <select
           value={defaultWallet}
-          onChange={(event) => setDefaultWallet(event.target.value)}
+          onChange={(event) =>
+            setDefaultWallet(event.target.value)
+          }
           disabled={readOnly}
         >
           {wallets.map((wallet) => (
-            <option key={wallet.id} value={wallet.address}>
+            <option
+              key={wallet.id}
+              value={wallet.address}
+            >
               {wallet.label} · {shortAddress(wallet.address)}
             </option>
           ))}
@@ -185,11 +215,16 @@ export default function BusinessProfilePanel({
         <span>Default receive asset</span>
         <select
           value={defaultAsset}
-          onChange={(event) => setDefaultAsset(event.target.value)}
+          onChange={(event) =>
+            setDefaultAsset(event.target.value)
+          }
           disabled={readOnly}
         >
           {ACTIVE_STABLECOINS.map((asset) => (
-            <option key={asset.symbol} value={asset.symbol}>
+            <option
+              key={asset.symbol}
+              value={asset.symbol}
+            >
               {asset.symbol} · {asset.name}
             </option>
           ))}
@@ -203,11 +238,20 @@ export default function BusinessProfilePanel({
         <button
           className="primaryButton"
           onClick={() => void save()}
-          disabled={readOnly || saving || !businessName.trim()}
+          disabled={
+            readOnly ||
+            saving ||
+            !businessName.trim()
+          }
         >
           {saving ? "Saving…" : "Save business profile"}
         </button>
       </div>
+
+      <BusinessApiPanel
+        businessProfileReady={Boolean(profile)}
+        readOnly={readOnly}
+      />
 
       <div className="paymentRequestHeading">
         <div>
@@ -219,29 +263,45 @@ export default function BusinessProfilePanel({
       <div className="reviewRows">
         <div>
           <span>Pending requests</span>
-          <strong>{loadingActivity ? "…" : pendingCount}</strong>
+          <strong>
+            {loadingActivity ? "…" : pendingCount}
+          </strong>
         </div>
         <div>
           <span>Paid requests</span>
-          <strong>{loadingActivity ? "…" : paidCount}</strong>
+          <strong>
+            {loadingActivity ? "…" : paidCount}
+          </strong>
         </div>
       </div>
 
       <div className="historyList">
         {payments.slice(0, 3).map((payment) => (
-          <article className="historyRow" key={payment.id}>
+          <article
+            className="historyRow"
+            key={payment.id}
+          >
             <div>
               <strong>
-                {payment.intent.destinationAmount ?? payment.intent.sourceAmount}{" "}
+                {payment.intent.destinationAmount ??
+                  payment.intent.sourceAmount}{" "}
                 {payment.intent.destinationAsset.symbol}
               </strong>
-              <span>To {shortAddress(payment.intent.destination)}</span>
+              <span>
+                To {shortAddress(payment.intent.destination)}
+              </span>
             </div>
+
             <div className="historyMeta">
-              <span>{new Date(payment.settledAt).toLocaleString()}</span>
+              <span>
+                {new Date(
+                  payment.settledAt,
+                ).toLocaleString()}
+              </span>
             </div>
           </article>
         ))}
+
         {!loadingActivity && payments.length === 0 ? (
           <p className="hint">No settled payments yet.</p>
         ) : null}

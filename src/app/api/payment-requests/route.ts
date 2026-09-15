@@ -1,46 +1,31 @@
-import { isAddress, parseUnits } from "viem";
-import { getActiveStablecoin } from "@/lib/assets";
-import { ACTIVE_PAYMENT_NETWORK } from "@/lib/celo";
-import type { BusinessPaymentRequest } from "@/lib/payments/businessRequest";
 import { AccessPolicyError, requireSensitiveAction } from "@/lib/server/access";
+import { AuthError, requirePrivyUser } from "@/lib/server/privy";
 import {
-  AuthError,
-  getPrivyLinkedEvmAddresses,
-  requirePrivyUser,
-} from "@/lib/server/privy";
-import {
-  mapBusinessPaymentRequest,
+  TrackedPaymentRequestError,
+  cancelTrackedPaymentRequestForUser,
+  createTrackedPaymentRequestForUser,
+  listTrackedPaymentRequestsForUser,
 } from "@/lib/server/paymentRequests";
-import { getSupabaseAdmin } from "@/lib/server/supabase";
-import { getBusinessName } from "@/lib/server/businessProfile";
 
 export const runtime = "nodejs";
-
-const MAX_MEMO_LENGTH = 120;
 
 export async function GET(request: Request) {
   try {
     const { userId } = await requirePrivyUser(request);
-    const supabase = getSupabaseAdmin();
-
-    const { data, error } = await supabase
-      .from("business_payment_requests")
-      .select("id, recipient, asset_symbol, network, amount, memo, business_name_snapshot, status, payment_tx_hash, created_at, paid_at, cancelled_at")
-      .eq("privy_user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (error) throw error;
 
     return Response.json({
-      requests: (data ?? []).map((row) => mapBusinessPaymentRequest(row)),
+      requests: await listTrackedPaymentRequestsForUser(userId),
     });
   } catch (error) {
     if (error instanceof AuthError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
+
     console.error("payment request list failed", error);
-    return Response.json({ error: "Could not load payment requests" }, { status: 500 });
+    return Response.json(
+      { error: "Could not load payment requests" },
+      { status: 500 },
+    );
   }
 }
 
@@ -54,75 +39,36 @@ export async function POST(request: Request) {
       asset?: string;
       amount?: string;
       memo?: string;
+      externalReference?: string;
     };
 
-    if (!body.recipient || !isAddress(body.recipient)) {
-      return Response.json({ error: "Invalid receive wallet" }, { status: 400 });
-    }
-
-    const asset = getActiveStablecoin(body.asset);
-    if (!asset || asset.network !== ACTIVE_PAYMENT_NETWORK) {
-      return Response.json({ error: "Unsupported payment request asset" }, { status: 400 });
-    }
-
-    let rawAmount: bigint;
-    try {
-      rawAmount = parseUnits(body.amount?.trim() ?? "", asset.decimals);
-    } catch {
-      return Response.json(
-        { error: "Tracked payment requests require a valid fixed amount" },
-        { status: 400 },
-      );
-    }
-
-    if (rawAmount <= BigInt(0)) {
-      return Response.json(
-        { error: "Tracked payment requests require a fixed amount" },
-        { status: 400 },
-      );
-    }
-
-    const memo = body.memo?.trim() || null;
-    if (memo && memo.length > MAX_MEMO_LENGTH) {
-      return Response.json({ error: "Reference is too long" }, { status: 400 });
-    }
-
-    const linkedWallets = await getPrivyLinkedEvmAddresses(userId);
-    if (!linkedWallets.has(body.recipient.toLowerCase())) {
-      return Response.json(
-        { error: "Receive wallet is not linked to this Krypto121 account" },
-        { status: 403 },
-      );
-    }
-
-    const businessName = await getBusinessName(userId);
-    const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from("business_payment_requests")
-      .insert({
-        privy_user_id: userId,
-        recipient: body.recipient,
-        asset_symbol: asset.symbol,
-        network: asset.network,
-        amount: body.amount!.trim(),
-        memo,
-        business_name_snapshot: businessName ?? null,
-        status: "pending",
-      })
-      .select("id, recipient, asset_symbol, network, amount, memo, business_name_snapshot, status, payment_tx_hash, created_at, paid_at, cancelled_at")
-      .single();
-
-    if (error) throw error;
-
-    return Response.json({
-      request: mapBusinessPaymentRequest(data) as BusinessPaymentRequest,
+    const created = await createTrackedPaymentRequestForUser({
+      userId,
+      recipient: body.recipient ?? "",
+      assetSymbol: body.asset ?? "",
+      amount: body.amount ?? "",
+      memo: body.memo,
+      externalReference: body.externalReference,
     });
+
+    return Response.json(
+      { request: created.request },
+      { status: created.reused ? 200 : 201 },
+    );
   } catch (error) {
-    if (error instanceof AuthError || error instanceof AccessPolicyError) {
+    if (
+      error instanceof AuthError ||
+      error instanceof AccessPolicyError ||
+      error instanceof TrackedPaymentRequestError
+    ) {
       return Response.json({ error: error.message }, { status: error.status });
     }
+
     console.error("payment request create failed", error);
-    return Response.json({ error: "Could not create tracked payment request" }, { status: 500 });
+    return Response.json(
+      { error: "Could not create tracked payment request" },
+      { status: 500 },
+    );
   }
 }
 
@@ -137,36 +83,31 @@ export async function PATCH(request: Request) {
     };
 
     if (!body.id || body.action !== "cancel") {
-      return Response.json({ error: "Invalid payment request action" }, { status: 400 });
-    }
-
-    const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from("business_payment_requests")
-      .update({
-        status: "cancelled",
-        cancelled_at: new Date().toISOString(),
-      })
-      .eq("id", body.id)
-      .eq("privy_user_id", userId)
-      .eq("status", "pending")
-      .select("id, recipient, asset_symbol, network, amount, memo, business_name_snapshot, status, payment_tx_hash, created_at, paid_at, cancelled_at")
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!data) {
       return Response.json(
-        { error: "Pending payment request not found" },
-        { status: 404 },
+        { error: "Invalid payment request action" },
+        { status: 400 },
       );
     }
 
-    return Response.json({ request: mapBusinessPaymentRequest(data) });
+    return Response.json({
+      request: await cancelTrackedPaymentRequestForUser(
+        userId,
+        body.id,
+      ),
+    });
   } catch (error) {
-    if (error instanceof AuthError || error instanceof AccessPolicyError) {
+    if (
+      error instanceof AuthError ||
+      error instanceof AccessPolicyError ||
+      error instanceof TrackedPaymentRequestError
+    ) {
       return Response.json({ error: error.message }, { status: error.status });
     }
+
     console.error("payment request cancel failed", error);
-    return Response.json({ error: "Could not cancel payment request" }, { status: 500 });
+    return Response.json(
+      { error: "Could not cancel payment request" },
+      { status: 500 },
+    );
   }
 }

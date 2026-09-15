@@ -11,6 +11,7 @@ export type BusinessPaymentRequest = {
   amount: string;
   memo?: string;
   businessName?: string;
+  externalReference?: string;
   status: BusinessPaymentRequestStatus;
   paymentTxHash?: `0x${string}`;
   createdAt: string;

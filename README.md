@@ -1,76 +1,86 @@
-# Krypto121 v0.24 — Business + Beneficiaries
+# Krypto121 v0.25 — Business payment/API improvements
 
-This revised v0.24 replaces the earlier v0.24 package.
+Overlay for v0.24.
 
-**Do not apply the earlier migration 010. Use the migration included here.**
+## Business API key
 
-## Own business identity
+Each Krypto121 Business account can maintain one active Business API key.
 
-Krypto121 Business profile:
+Key format:
 
-- Business / trading name
-- Country
-- Business email
-- Default receive wallet
-- Default receive stablecoin
+```text
+k121_live_...
+```
 
-New tracked incoming payment requests snapshot the business name for payer-facing identity.
+or in testnet mode:
 
-## Beneficiaries
+```text
+k121_test_...
+```
 
-Dedicated page:
+The full secret is shown only once when generated or rotated.
 
-`/beneficiaries`
+Krypto121 stores only:
 
-Each partner is one accordion row, sorted alphabetically.
+- a display prefix;
+- SHA-256 hash;
+- created time;
+- last-used time;
+- revocation time.
 
-A partner has:
+## Versioned Business payment API
 
-- Name
-- Type: Business / Private
-- Multiple wallets
+```text
+/api/v1/payment-requests
+```
 
-Wallet addresses are editable and removable. They are intentionally not immutable.
+Authentication:
 
-Expanded partner controls include:
+```http
+Authorization: Bearer <KRYPT0121_API_KEY>
+```
 
-- edit name/type;
-- edit a wallet address;
-- remove a wallet;
-- add another wallet;
-- choose the payment wallet;
-- **Make payment to this partner**;
-- **Payment history** modal.
+Supported operations:
 
-## First payment to a new wallet
+- `POST` — create a tracked fixed-amount payment request
+- `GET` — list requests
+- `GET ?id=<request-id>` — read one request
+- `GET ?externalReference=<value>` — read by external reference
+- `PATCH` — cancel a pending request
 
-After a successful payment to an unknown address, Krypto121 shows:
+## Create example
 
-`Save recipient`
+```json
+{
+  "amount": "125.50",
+  "memo": "Invoice 1042",
+  "externalReference": "order-1042"
+}
+```
 
-The wallet can be saved as:
+If `recipient` and `asset` are omitted, Krypto121 uses the Business profile's default receive wallet and default receive asset.
 
-- a new Business partner;
-- a new Private partner;
-- another wallet on an existing partner.
+The response includes a ready-to-share `paymentUrl`.
 
-The settled payment is then associated with that partner.
+## External reference
 
-## History association
+`externalReference` is optional and unique per Krypto121 account.
 
-Payments now have an optional `beneficiary_partner_id`.
+Repeating the same create request with the same reference and identical payment facts returns the existing request instead of creating a duplicate.
 
-That lets partner history remain associated with the partner even if a wallet is edited later.
+Reusing the reference with different payment facts returns HTTP 409.
 
-Migration 010 also backfills existing payments when their destination matches an existing legacy beneficiary wallet.
+## No new environment variables
+
+The Business API key is generated and stored by Krypto121.
 
 ## Migration
 
-Apply only:
+Apply:
 
-`supabase/migrations/202609150010_business_profiles.sql`
-
-No migration 011 is required.
+```text
+supabase/migrations/202609150011_business_api.sql
+```
 
 ## Build
 

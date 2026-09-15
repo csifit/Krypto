@@ -12,6 +12,7 @@ import {
   mapBusinessPaymentRequest,
 } from "@/lib/server/paymentRequests";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getBusinessName } from "@/lib/server/businessProfile";
 
 export const runtime = "nodejs";
 
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase
       .from("business_payment_requests")
-      .select("id, recipient, asset_symbol, network, amount, memo, status, payment_tx_hash, created_at, paid_at, cancelled_at")
+      .select("id, recipient, asset_symbol, network, amount, memo, business_name_snapshot, status, payment_tx_hash, created_at, paid_at, cancelled_at")
       .eq("privy_user_id", userId)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -94,6 +95,7 @@ export async function POST(request: Request) {
       );
     }
 
+    const businessName = await getBusinessName(userId);
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("business_payment_requests")
@@ -104,9 +106,10 @@ export async function POST(request: Request) {
         network: asset.network,
         amount: body.amount!.trim(),
         memo,
+        business_name_snapshot: businessName ?? null,
         status: "pending",
       })
-      .select("id, recipient, asset_symbol, network, amount, memo, status, payment_tx_hash, created_at, paid_at, cancelled_at")
+      .select("id, recipient, asset_symbol, network, amount, memo, business_name_snapshot, status, payment_tx_hash, created_at, paid_at, cancelled_at")
       .single();
 
     if (error) throw error;
@@ -147,7 +150,7 @@ export async function PATCH(request: Request) {
       .eq("id", body.id)
       .eq("privy_user_id", userId)
       .eq("status", "pending")
-      .select("id, recipient, asset_symbol, network, amount, memo, status, payment_tx_hash, created_at, paid_at, cancelled_at")
+      .select("id, recipient, asset_symbol, network, amount, memo, business_name_snapshot, status, payment_tx_hash, created_at, paid_at, cancelled_at")
       .maybeSingle();
 
     if (error) throw error;

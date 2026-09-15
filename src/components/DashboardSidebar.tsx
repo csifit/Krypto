@@ -6,6 +6,7 @@ import { ACTIVE_ENVIRONMENT_LABEL } from "@/lib/celo";
 export type SecondarySection =
   | "wallets"
   | "beneficiaries"
+  | "business"
   | "requests"
   | "history"
   | "developer"
@@ -61,6 +62,12 @@ export default function DashboardSidebar({
               onClick={() => select("beneficiaries")}
             >
               Beneficiaries
+            </button>
+            <button
+              className={activeSection === "business" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}
+              onClick={() => select("business")}
+            >
+              Business profile
             </button>
             <button
               className={activeSection === "requests" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}

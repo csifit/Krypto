@@ -30,10 +30,16 @@ export default function ReceivePanel({
   wallets,
   getAccessToken,
   onTrackedRequestCreated,
+  defaultWalletAddress,
+  defaultAssetSymbol,
+  businessName,
 }: {
   wallets: ReceiveWalletOption[];
   getAccessToken(): Promise<string | null>;
   onTrackedRequestCreated?(): void;
+  defaultWalletAddress?: `0x${string}`;
+  defaultAssetSymbol?: StablecoinSymbol;
+  businessName?: string;
 }) {
   const [selectedId, setSelectedId] = useState(wallets[0]?.id ?? "");
   const [assetSymbol, setAssetSymbol] = useState<StablecoinSymbol>(
@@ -59,6 +65,20 @@ export default function ReceivePanel({
   useEffect(() => {
     if (!selected && wallets[0]) setSelectedId(wallets[0].id);
   }, [selected, wallets]);
+
+  useEffect(() => {
+    if (!defaultWalletAddress) return;
+    const match = wallets.find(
+      (wallet) => wallet.address.toLowerCase() === defaultWalletAddress.toLowerCase(),
+    );
+    if (match) setSelectedId(match.id);
+  }, [defaultWalletAddress, wallets]);
+
+  useEffect(() => {
+    if (defaultAssetSymbol && getActiveStablecoin(defaultAssetSymbol)) {
+      setAssetSymbol(defaultAssetSymbol);
+    }
+  }, [defaultAssetSymbol]);
 
   useEffect(() => {
     setCanShare(
@@ -296,6 +316,7 @@ export default function ReceivePanel({
                   ? `${amount.trim()} ${selectedAsset.symbol}`
                   : `${selectedAsset.symbol} · amount chosen by payer`}
               </strong>
+              {businessName ? <span>From {businessName}</span> : null}
               <span>To {selected.label} · {shortAddress(selected.address)}</span>
               {tracked ? <span>Tracked request · Pending</span> : <span>Reusable request</span>}
               {memo.trim() ? <span>Reference: {memo.trim()}</span> : null}

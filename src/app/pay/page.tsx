@@ -43,6 +43,7 @@ export default async function PayPage({
 }) {
   const values = await searchParams;
   const request = parsePaymentRequestParams(toSearchParams(values));
+  let businessName: string | undefined;
 
   if (!request) {
     return (
@@ -94,6 +95,8 @@ export default async function PayPage({
         </main>
       );
     }
+
+    businessName = tracked.businessName;
   }
 
   const privyConfigured = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
@@ -109,5 +112,5 @@ export default async function PayPage({
     );
   }
 
-  return <WalletDashboard initialPaymentRequest={request} />;
+  return <WalletDashboard initialPaymentRequest={request} initialBusinessName={businessName} />;
 }

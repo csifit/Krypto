@@ -1,0 +1,179 @@
+.beneficiariesPageContent {
+  width: min(1120px, calc(100% - 64px));
+}
+
+.beneficiaryCreateCard {
+  margin-bottom: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 22px;
+}
+
+.beneficiaryAccordionList {
+  border-top: 1px solid var(--line);
+}
+
+.partnerAccordion {
+  border-bottom: 1px solid var(--line);
+  transition: background-color 150ms ease;
+}
+
+.partnerAccordion[open] {
+  background: var(--accordion-open);
+}
+
+.partnerAccordionSummary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 18px;
+  gap: 18px;
+  align-items: center;
+  min-height: 68px;
+  cursor: pointer;
+  list-style: none;
+  padding: 0 12px;
+}
+
+.partnerAccordionSummary::-webkit-details-marker {
+  display: none;
+}
+
+.partnerSummaryIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.partnerSummaryIdentity > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.partnerTypeBadge {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.partnerType-business {
+  background: var(--soft);
+}
+
+.partnerType-private {
+  color: var(--muted);
+}
+
+.partnerSummaryWallets {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.partnerAccordionBody {
+  padding: 4px 12px 22px;
+}
+
+.partnerWalletSection,
+.partnerPaymentSection {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+.partnerWalletRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 9px;
+}
+
+.partnerWalletRow input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 0 12px;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.partnerWalletAddRow {
+  margin-top: 14px;
+}
+
+.partnerAccordionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.partnerModalBackdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 20px;
+}
+
+.partnerModal {
+  width: min(720px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 22px;
+  box-shadow: var(--shadow);
+}
+
+.partnerModalHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.partnerModalHeader h2 {
+  margin: 6px 0 0;
+}
+
+.saveRecipientCard {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--soft);
+  padding: 16px;
+}
+
+@media (max-width: 700px) {
+  .beneficiariesPageContent {
+    width: min(100% - 28px, 720px);
+  }
+
+  .partnerAccordionSummary {
+    grid-template-columns: minmax(0, 1fr) 18px;
+  }
+
+  .partnerSummaryWallets {
+    display: none;
+  }
+
+  .partnerWalletRow {
+    grid-template-columns: 1fr;
+  }
+
+  .partnerWalletRow .secondaryButton,
+  .partnerAccordionActions .primaryButton,
+  .partnerAccordionActions .secondaryButton {
+    width: 100%;
+  }
+}

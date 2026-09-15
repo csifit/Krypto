@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { isAddress } from "viem";
-import BeneficiariesPanel from "@/components/BeneficiariesPanel";
+import BusinessProfilePanel from "@/components/BusinessProfilePanel";
 import DashboardSidebar, { type SecondarySection } from "@/components/DashboardSidebar";
 import PaymentHistory from "@/components/PaymentHistory";
 import PaymentRequestsPanel from "@/components/PaymentRequestsPanel";
@@ -23,14 +23,14 @@ import {
   getAddressExplorerUrl,
 } from "@/lib/celo";
 import {
-  createBeneficiary,
-  deleteBeneficiary,
-  listBeneficiaries,
+  listBeneficiaryPartners,
   listWalletLabels,
+  getBusinessProfile,
   syncProfile,
   type AccountProfileSummary,
 } from "@/lib/backend/client";
-import type { Beneficiary } from "@/lib/payments/types";
+import type { BeneficiaryPartner } from "@/lib/beneficiaries/types";
+import type { BusinessProfile } from "@/lib/business/profile";
 import type { PaymentRequest } from "@/lib/payments/paymentRequest";
 import type { LinkedWalletView } from "@/lib/wallet/directory";
 import { createPrivyWalletProvider } from "@/lib/wallet/privy";
@@ -66,8 +66,10 @@ function displayProvider(value?: string) {
 
 export default function WalletDashboard({
   initialPaymentRequest,
+  initialBusinessName,
 }: {
   initialPaymentRequest?: PaymentRequest;
+  initialBusinessName?: string;
 } = {}) {
   const router = useRouter();
   const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
@@ -76,19 +78,23 @@ export default function WalletDashboard({
   const [showSend, setShowSend] = useState(Boolean(initialPaymentRequest));
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SecondarySection>(null);
-  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [beneficiaryPartners, setBeneficiaryPartners] = useState<BeneficiaryPartner[]>([]);
   const [walletLabels, setWalletLabels] = useState<Record<string, string>>({});
-  const [beneficiariesLoading, setBeneficiariesLoading] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [requestRefreshKey, setRequestRefreshKey] = useState(0);
   const [accountProfile, setAccountProfile] = useState<AccountProfileSummary | null>(null);
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
   const [copied, setCopied] = useState(false);
   const [initialSourceAddress, setInitialSourceAddress] = useState<`0x${string}` | undefined>();
+  const [initialRecipientAddress, setInitialRecipientAddress] = useState<`0x${string}` | undefined>();
+  const [initialPartnerId, setInitialPartnerId] = useState<string | undefined>();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedSource = params.get("payFrom");
+    const requestedRecipient = params.get("payTo");
+    const requestedPartner = params.get("partner");
     const requestedSection = params.get("section");
 
     if (requestedSource && isAddress(requestedSource)) {
@@ -97,7 +103,14 @@ export default function WalletDashboard({
       setShowReceive(false);
     }
 
-    if (requestedSection === "beneficiaries" || requestedSection === "requests" || requestedSection === "history" || requestedSection === "developer") {
+    if (requestedRecipient && isAddress(requestedRecipient)) {
+      setInitialRecipientAddress(requestedRecipient as `0x${string}`);
+      setInitialPartnerId(requestedPartner ?? undefined);
+      setShowSend(true);
+      setShowReceive(false);
+    }
+
+    if (requestedSection === "beneficiaries" || requestedSection === "business" || requestedSection === "requests" || requestedSection === "history" || requestedSection === "developer") {
       setActiveSection(requestedSection);
     }
   }, []);
@@ -105,6 +118,10 @@ export default function WalletDashboard({
   function handleSidebar(section: SecondarySection) {
     if (section === "wallets") {
       router.push("/wallets");
+      return;
+    }
+    if (section === "beneficiaries") {
+      router.push("/beneficiaries");
       return;
     }
     setActiveSection(section);
@@ -244,29 +261,31 @@ export default function WalletDashboard({
     const walletAddress = walletProvider?.address;
 
     if (!walletAddress) {
-      setBeneficiaries([]);
+      setBeneficiaryPartners([]);
       setWalletLabels({});
       setAccountProfile(null);
+      setBusinessProfile(null);
       return;
     }
 
     let cancelled = false;
 
     async function loadBackend(address: `0x${string}`) {
-      setBeneficiariesLoading(true);
       setBackendError(null);
 
       try {
         const profileResult = await syncProfile(getAccessToken, address);
 
-        const [nextBeneficiaries, nextWalletLabels] = await Promise.all([
-          listBeneficiaries(getAccessToken),
+        const [nextBeneficiaryPartners, nextWalletLabels, nextBusinessProfile] = await Promise.all([
+          listBeneficiaryPartners(getAccessToken),
           listWalletLabels(getAccessToken),
+          getBusinessProfile(getAccessToken),
         ]);
 
         if (!cancelled) {
           setAccountProfile(profileResult.profile);
-          setBeneficiaries(nextBeneficiaries);
+          setBeneficiaryPartners(nextBeneficiaryPartners);
+          setBusinessProfile(nextBusinessProfile);
           const labelMap: Record<string, string> = {};
           for (const item of nextWalletLabels) {
             labelMap[item.address.toLowerCase()] = item.label;
@@ -282,7 +301,7 @@ export default function WalletDashboard({
           );
         }
       } finally {
-        if (!cancelled) setBeneficiariesLoading(false);
+        // Backend loading completes with the profile/wallet state above.
       }
     }
 
@@ -292,21 +311,6 @@ export default function WalletDashboard({
       cancelled = true;
     };
   }, [getAccessToken, walletProvider?.address]);
-
-  async function addBeneficiary(name: string, address: `0x${string}`) {
-    if (!walletProvider) return;
-    const created = await createBeneficiary(getAccessToken, {
-      name,
-      address,
-      walletAddress: walletProvider.address,
-    });
-    setBeneficiaries((current) => [...current, created]);
-  }
-
-  async function removeBeneficiary(id: string) {
-    await deleteBeneficiary(getAccessToken, id);
-    setBeneficiaries((current) => current.filter((item) => item.id !== id));
-  }
 
   async function refreshAll() {
     await portfolio.refresh();
@@ -340,13 +344,13 @@ export default function WalletDashboard({
 
           {initialPaymentRequest ? (
             <div className="incomingPaymentRequest">
-              <span>Payment request</span>
+              <span>{initialBusinessName ? `Pay ${initialBusinessName}` : "Payment request"}</span>
               <strong>
                 {initialPaymentRequest.amount
                   ? `${initialPaymentRequest.amount} ${initialPaymentRequest.asset}`
                   : `${initialPaymentRequest.asset} · amount to enter`}
               </strong>
-              <small>To {shortAddress(initialPaymentRequest.recipient)}</small>
+              <small>To {initialBusinessName ?? shortAddress(initialPaymentRequest.recipient)}</small>
               {initialPaymentRequest.memo ? <small>Reference: {initialPaymentRequest.memo}</small> : null}
             </div>
           ) : null}
@@ -426,6 +430,23 @@ export default function WalletDashboard({
               </article>
 
               <article className="dashboardCard">
+                <span className="cardLabel">Business</span>
+                <strong className="cardActionTitle">
+                  {businessProfile?.businessName ?? "Set up business profile"}
+                </strong>
+                <span className="cardSubtle">
+                  {businessProfile?.defaultReceiveAsset
+                    ? `Default receive · ${businessProfile.defaultReceiveAsset}`
+                    : "Add payment identity and receive defaults"}
+                </span>
+                <div className="cardActionsCompact">
+                  <button className="textButton" onClick={() => setActiveSection("business")}>
+                    {businessProfile ? "Edit" : "Set up"}
+                  </button>
+                </div>
+              </article>
+
+              <article className="dashboardCard">
                 <span className="cardLabel">Send / Receive</span>
                 <strong className="cardActionTitle">Move funds</strong>
                 <div className="cardPrimaryActions">
@@ -473,9 +494,13 @@ export default function WalletDashboard({
               <SendPanel
                 accountWalletAddress={walletProvider.address}
                 sourceWallets={paymentSources}
-                beneficiaries={beneficiaries}
+                beneficiaryPartners={beneficiaryPartners}
                 initialRequest={initialPaymentRequest}
+                paymentRequestBusinessName={initialBusinessName}
                 initialSourceAddress={initialSourceAddress}
+                initialRecipientAddress={initialRecipientAddress}
+                initialBeneficiaryPartnerId={initialPartnerId}
+                onPartnersChanged={setBeneficiaryPartners}
                 onSent={refreshAll}
               />
             ) : null}
@@ -485,6 +510,9 @@ export default function WalletDashboard({
                 wallets={receiveWallets}
                 getAccessToken={getAccessToken}
                 onTrackedRequestCreated={() => setRequestRefreshKey((value) => value + 1)}
+                defaultWalletAddress={businessProfile?.defaultReceiveWallet}
+                defaultAssetSymbol={businessProfile?.defaultReceiveAsset}
+                businessName={businessProfile?.businessName}
               />
             ) : null}
           </div>
@@ -495,12 +523,12 @@ export default function WalletDashboard({
                 <button className="textButton" onClick={() => setActiveSection(null)}>Close</button>
               </div>
 
-              {activeSection === "beneficiaries" && walletProvider ? (
-                <BeneficiariesPanel
-                  beneficiaries={beneficiaries}
-                  loading={beneficiariesLoading}
-                  onAdd={addBeneficiary}
-                  onRemove={removeBeneficiary}
+              {activeSection === "business" && walletProvider ? (
+                <BusinessProfilePanel
+                  wallets={receiveWallets}
+                  accountEmail={accountProfile?.email}
+                  profile={businessProfile}
+                  onSaved={setBusinessProfile}
                   readOnly={!accountProfile || accountProfile.accountStatus !== "active"}
                 />
               ) : null}

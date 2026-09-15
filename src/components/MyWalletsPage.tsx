@@ -185,6 +185,10 @@ export default function MyWalletsPage() {
 
   function handleSidebar(section: SecondarySection) {
     if (section === "wallets") return;
+    if (section === "beneficiaries") {
+      router.push("/beneficiaries");
+      return;
+    }
     if (section === null) {
       router.push("/");
       return;
@@ -269,6 +273,10 @@ export default function MyWalletsPage() {
     );
   }
 
+  const stablecoinSummary = ACTIVE_STABLECOINS
+    .map((asset) => `${formatBalance(stablecoinTotals[asset.symbol] ?? 0)} ${asset.symbol}`)
+    .join(" · ");
+
   return (
     <div className="dashboardApp">
       <DashboardSidebar
@@ -300,15 +308,7 @@ export default function MyWalletsPage() {
               </p>
             </div>
             <div className="walletPageSummary">
-              <strong className="stablecoinBalanceStack">
-                {portfolio.loading
-                  ? "…"
-                  : ACTIVE_STABLECOINS.map((asset) => (
-                      <span key={asset.symbol}>
-                        {formatBalance(stablecoinTotals[asset.symbol] ?? 0)} {asset.symbol}
-                      </span>
-                    ))}
-              </strong>
+              <strong>{portfolio.loading ? "…" : stablecoinSummary}</strong>
               <span>{ownedAddresses.length} owned {ownedAddresses.length === 1 ? "wallet" : "wallets"}</span>
               {bitcoinAddresses.length ? (
                 <span className="walletPageBitcoinSummary">

@@ -11,6 +11,7 @@ type PaymentRequestRow = {
   network: string;
   amount: string | number;
   memo: string | null;
+  business_name_snapshot: string | null;
   status: "pending" | "paid" | "cancelled";
   payment_tx_hash: string | null;
   created_at: string;
@@ -26,6 +27,7 @@ export function mapBusinessPaymentRequest(row: PaymentRequestRow): BusinessPayme
     network: row.network as BusinessPaymentRequest["network"],
     amount: String(row.amount),
     memo: row.memo ?? undefined,
+    businessName: row.business_name_snapshot ?? undefined,
     status: row.status,
     paymentTxHash: row.payment_tx_hash ? (row.payment_tx_hash as `0x${string}`) : undefined,
     createdAt: row.created_at,
@@ -42,7 +44,7 @@ export async function getPublicTrackedPaymentRequest(
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("business_payment_requests")
-    .select("id, recipient, asset_symbol, network, amount, memo, status, payment_tx_hash, created_at, paid_at, cancelled_at")
+    .select("id, recipient, asset_symbol, network, amount, memo, business_name_snapshot, status, payment_tx_hash, created_at, paid_at, cancelled_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -76,7 +78,7 @@ export async function reconcileTrackedPaymentRequest(
   const supabase = getSupabaseAdmin();
   const { data: row, error } = await supabase
     .from("business_payment_requests")
-    .select("id, recipient, asset_symbol, network, amount, memo, status, payment_tx_hash, created_at, paid_at, cancelled_at")
+    .select("id, recipient, asset_symbol, network, amount, memo, business_name_snapshot, status, payment_tx_hash, created_at, paid_at, cancelled_at")
     .eq("id", requestId)
     .maybeSingle();
 

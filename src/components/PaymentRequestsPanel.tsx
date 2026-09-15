@@ -98,6 +98,7 @@ export default function PaymentRequestsPanel({
             <article className="historyRow" key={request.id}>
               <div>
                 <strong>{request.amount} {request.asset}</strong>
+                {request.businessName ? <span>{request.businessName}</span> : null}
                 <span>To {shortAddress(request.recipient)}</span>
                 {request.memo ? <span>{request.memo}</span> : null}
                 <span>Created {new Date(request.createdAt).toLocaleString()}</span>

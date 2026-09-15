@@ -10,6 +10,7 @@ export type BusinessPaymentRequest = {
   network: CeloPaymentNetwork;
   amount: string;
   memo?: string;
+  businessName?: string;
   status: BusinessPaymentRequestStatus;
   paymentTxHash?: `0x${string}`;
   createdAt: string;

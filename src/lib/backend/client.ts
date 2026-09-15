@@ -5,6 +5,8 @@ import type {
 import type { WalletLabel, WatchWallet } from "@/lib/wallet/directory";
 import type { KryptoRelayQuote, KryptoRelayStatus } from "@/lib/relay/types";
 import type { BusinessPaymentRequest } from "@/lib/payments/businessRequest";
+import type { BusinessProfile } from "@/lib/business/profile";
+import type { BeneficiaryPartner, PartnerType } from "@/lib/beneficiaries/types";
 
 type AccessTokenGetter = () => Promise<string | null>;
 
@@ -103,6 +105,117 @@ export async function syncProfile(getAccessToken: AccessTokenGetter, walletAddre
   return authedRequest<{ profile: AccountProfileSummary }>(getAccessToken, "/api/profile", {
     method: "POST",
     body: JSON.stringify({ walletAddress }),
+  });
+}
+
+
+export async function getBusinessProfile(
+  getAccessToken: AccessTokenGetter,
+) {
+  return (await authedRequest<{ businessProfile: BusinessProfile | null }>(
+    getAccessToken,
+    "/api/business-profile",
+  )).businessProfile;
+}
+
+export async function saveBusinessProfile(
+  getAccessToken: AccessTokenGetter,
+  input: {
+    businessName: string;
+    countryCode?: string;
+    businessEmail?: string;
+    defaultReceiveWallet?: `0x${string}`;
+    defaultReceiveAsset?: string;
+  },
+) {
+  return (await authedRequest<{ businessProfile: BusinessProfile }>(
+    getAccessToken,
+    "/api/business-profile",
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+  )).businessProfile;
+}
+
+export async function listBeneficiaryPartners(
+  getAccessToken: AccessTokenGetter,
+) {
+  return (await authedRequest<{ partners: BeneficiaryPartner[] }>(
+    getAccessToken,
+    "/api/beneficiary-partners",
+  )).partners;
+}
+
+export async function createBeneficiaryPartner(
+  getAccessToken: AccessTokenGetter,
+  input: { name: string; partnerType: PartnerType; address: `0x${string}` },
+) {
+  return (await authedRequest<{ partners: BeneficiaryPartner[] }>(
+    getAccessToken,
+    "/api/beneficiary-partners",
+    { method: "POST", body: JSON.stringify(input) },
+  )).partners;
+}
+
+async function patchBeneficiaryPartners(
+  getAccessToken: AccessTokenGetter,
+  input: Record<string, unknown>,
+) {
+  return (await authedRequest<{ partners: BeneficiaryPartner[] }>(
+    getAccessToken,
+    "/api/beneficiary-partners",
+    { method: "PATCH", body: JSON.stringify(input) },
+  )).partners;
+}
+
+export function updateBeneficiaryPartner(
+  getAccessToken: AccessTokenGetter,
+  input: { partnerId: string; name: string; partnerType: PartnerType },
+) {
+  return patchBeneficiaryPartners(getAccessToken, {
+    action: "update-partner",
+    ...input,
+  });
+}
+
+export function addBeneficiaryWallet(
+  getAccessToken: AccessTokenGetter,
+  input: { partnerId: string; address: `0x${string}` },
+) {
+  return patchBeneficiaryPartners(getAccessToken, {
+    action: "add-wallet",
+    ...input,
+  });
+}
+
+export function updateBeneficiaryWallet(
+  getAccessToken: AccessTokenGetter,
+  input: { partnerId: string; walletId: string; address: `0x${string}` },
+) {
+  return patchBeneficiaryPartners(getAccessToken, {
+    action: "update-wallet",
+    ...input,
+  });
+}
+
+export function removeBeneficiaryWallet(
+  getAccessToken: AccessTokenGetter,
+  input: { partnerId: string; walletId: string },
+) {
+  return patchBeneficiaryPartners(getAccessToken, {
+    action: "remove-wallet",
+    ...input,
+  });
+}
+
+export function attachPaymentToBeneficiaryPartner(
+  getAccessToken: AccessTokenGetter,
+  input: { partnerId: string; paymentId: string },
+) {
+  return patchBeneficiaryPartners(getAccessToken, {
+    action: "attach-payment",
+    ...input,
   });
 }
 

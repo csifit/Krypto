@@ -27,7 +27,10 @@ import {
 } from "@/lib/payments/directCelo";
 import { createRelayPayment } from "@/lib/payments/relay";
 import {
+  addBeneficiaryWallet,
+  attachPaymentToBeneficiaryPartner,
   authorizePayment,
+  createBeneficiaryPartner,
   getRelayQuote,
   markRelaySubmitted,
   readRelayStatus,
@@ -37,12 +40,12 @@ import { executeRelayQuote } from "@/lib/relay/execution";
 import QrScanner from "@/components/QrScanner";
 import { parsePaymentRequestPayload, type PaymentRequest } from "@/lib/payments/paymentRequest";
 import type {
-  Beneficiary,
   PaymentIntent,
   PaymentQuote,
 } from "@/lib/payments/types";
 import type { PaymentSourceWallet } from "@/lib/wallet/types";
 import type { KryptoRelayQuote } from "@/lib/relay/types";
+import type { BeneficiaryPartner, PartnerType } from "@/lib/beneficiaries/types";
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -80,19 +83,28 @@ async function waitForRelaySettlement(
 export default function SendPanel({
   accountWalletAddress,
   sourceWallets,
-  beneficiaries,
+  beneficiaryPartners,
   initialRequest,
+  paymentRequestBusinessName,
   initialSourceAddress,
+  initialRecipientAddress,
+  initialBeneficiaryPartnerId,
+  onPartnersChanged,
   onSent,
 }: {
   accountWalletAddress: `0x${string}`;
   sourceWallets: PaymentSourceWallet[];
-  beneficiaries: Beneficiary[];
+  beneficiaryPartners: BeneficiaryPartner[];
   initialRequest?: PaymentRequest;
+  paymentRequestBusinessName?: string;
   initialSourceAddress?: `0x${string}`;
+  initialRecipientAddress?: `0x${string}`;
+  initialBeneficiaryPartnerId?: string;
+  onPartnersChanged?(partners: BeneficiaryPartner[]): void;
   onSent(): Promise<void>;
 }) {
   const [sourceId, setSourceId] = useState(sourceWallets[0]?.id ?? "");
+  const [selectedPartnerId, setSelectedPartnerId] = useState(initialBeneficiaryPartnerId ?? "");
   const [destination, setDestination] = useState<PaymentDestination>("celo");
   const [assetSymbol, setAssetSymbol] = useState<StablecoinSymbol>(
     initialRequest?.asset ?? DEFAULT_STABLECOIN.symbol,
@@ -109,6 +121,13 @@ export default function SendPanel({
   const [error, setError] = useState<string | null>(null);
   const [hash, setHash] = useState<`0x${string}` | null>(null);
   const [recordWarning, setRecordWarning] = useState<string | null>(null);
+  const [saveRecipientOpen, setSaveRecipientOpen] = useState(false);
+  const [saveRecipientMode, setSaveRecipientMode] = useState<"new" | "existing">("new");
+  const [saveRecipientName, setSaveRecipientName] = useState("");
+  const [saveRecipientType, setSaveRecipientType] = useState<PartnerType>("business");
+  const [saveRecipientExistingId, setSaveRecipientExistingId] = useState("");
+  const [saveRecipientWorking, setSaveRecipientWorking] = useState(false);
+  const [saveRecipientMessage, setSaveRecipientMessage] = useState<string | null>(null);
   const { getAccessToken } = usePrivy();
 
   const selectedSource =
@@ -146,6 +165,14 @@ export default function SendPanel({
     if (match) setSourceId(match.id);
   }, [initialSourceAddress, sourceWallets]);
 
+  useEffect(() => {
+    if (!initialRecipientAddress) return;
+    setRecipient(initialRecipientAddress);
+    setSelectedPartnerId(initialBeneficiaryPartnerId ?? "");
+    setError(null);
+    setStage("form");
+  }, [initialRecipientAddress, initialBeneficiaryPartnerId]);
+
   function clearQuote() {
     setIntent(null);
     setQuote(null);
@@ -179,8 +206,18 @@ export default function SendPanel({
     selectedAsset,
   );
 
-  const selectedBeneficiary = beneficiaries.find(
-    (item) => item.address.toLowerCase() === recipient.toLowerCase(),
+  const selectedPartner =
+    beneficiaryPartners.find((partner) => partner.id === selectedPartnerId) ??
+    beneficiaryPartners.find((partner) =>
+      partner.wallets.some(
+        (wallet) => wallet.address.toLowerCase() === recipient.toLowerCase(),
+      ),
+    );
+
+  const matchedPartnerByRecipient = beneficiaryPartners.find((partner) =>
+    partner.wallets.some(
+      (wallet) => wallet.address.toLowerCase() === recipient.toLowerCase(),
+    ),
   );
 
   const directReadiness = usePaymentReadiness({
@@ -369,7 +406,8 @@ export default function SendPanel({
         txHash,
         status: "settled" as const,
         settledAt: new Date().toISOString(),
-        beneficiaryName: selectedBeneficiary?.name,
+        beneficiaryName: selectedPartner?.name,
+        beneficiaryPartnerId: selectedPartner?.id,
       };
 
       try {
@@ -392,6 +430,68 @@ export default function SendPanel({
     }
   }
 
+  async function saveUnknownRecipient() {
+    if (!intent || !hash) return;
+
+    setSaveRecipientWorking(true);
+    setSaveRecipientMessage(null);
+
+    try {
+      let nextPartners: BeneficiaryPartner[];
+
+      if (saveRecipientMode === "existing") {
+        if (!saveRecipientExistingId) {
+          throw new Error("Choose an existing partner");
+        }
+
+        nextPartners = await addBeneficiaryWallet(getAccessToken, {
+          partnerId: saveRecipientExistingId,
+          address: intent.destination as `0x${string}`,
+        });
+
+        nextPartners = await attachPaymentToBeneficiaryPartner(getAccessToken, {
+          partnerId: saveRecipientExistingId,
+          paymentId: intent.id,
+        });
+      } else {
+        const name = saveRecipientName.trim();
+        if (!name) throw new Error("Enter a partner name");
+
+        nextPartners = await createBeneficiaryPartner(getAccessToken, {
+          name,
+          partnerType: saveRecipientType,
+          address: intent.destination as `0x${string}`,
+        });
+
+        const created = nextPartners.find((partner) =>
+          partner.wallets.some(
+            (wallet) =>
+              wallet.address.toLowerCase() === intent.destination.toLowerCase(),
+          ),
+        );
+
+        if (!created) {
+          throw new Error("Saved partner could not be resolved");
+        }
+
+        nextPartners = await attachPaymentToBeneficiaryPartner(getAccessToken, {
+          partnerId: created.id,
+          paymentId: intent.id,
+        });
+      }
+
+      onPartnersChanged?.(nextPartners);
+      setSaveRecipientMessage("Recipient saved.");
+      setSaveRecipientOpen(false);
+    } catch (err) {
+      setSaveRecipientMessage(
+        err instanceof Error ? err.message : "Could not save recipient",
+      );
+    } finally {
+      setSaveRecipientWorking(false);
+    }
+  }
+
   function reset() {
     setDestination("celo");
     setRecipient("");
@@ -405,6 +505,9 @@ export default function SendPanel({
     setError(null);
     setHash(null);
     setRecordWarning(null);
+    setSaveRecipientOpen(false);
+    setSaveRecipientMessage(null);
+    setSelectedPartnerId("");
     setScannerOpen(false);
     setStage("form");
   }
@@ -467,9 +570,133 @@ export default function SendPanel({
           </div>
         </details>
 
-        <div className="actions">
-          <button className="primaryButton" onClick={reset}>Send another</button>
-        </div>
+        {!matchedPartnerByRecipient ? (
+          <>
+            <div className="actions">
+              <button
+                className="secondaryButton"
+                onClick={() => {
+                  setSaveRecipientOpen(true);
+                  setSaveRecipientMessage(null);
+                }}
+              >
+                Save recipient
+              </button>
+              <button className="primaryButton" onClick={reset}>
+                Send another
+              </button>
+            </div>
+
+            {saveRecipientOpen ? (
+              <div className="saveRecipientCard">
+                <p className="eyebrow">Save recipient</p>
+
+                {beneficiaryPartners.length ? (
+                  <label className="field">
+                    <span>Save as</span>
+                    <select
+                      value={saveRecipientMode}
+                      onChange={(event) =>
+                        setSaveRecipientMode(
+                          event.target.value as "new" | "existing",
+                        )
+                      }
+                    >
+                      <option value="new">New partner</option>
+                      <option value="existing">
+                        Add wallet to existing partner
+                      </option>
+                    </select>
+                  </label>
+                ) : null}
+
+                {saveRecipientMode === "existing" &&
+                beneficiaryPartners.length ? (
+                  <label className="field">
+                    <span>Partner</span>
+                    <select
+                      value={saveRecipientExistingId}
+                      onChange={(event) =>
+                        setSaveRecipientExistingId(event.target.value)
+                      }
+                    >
+                      <option value="">Choose partner…</option>
+                      {[...beneficiaryPartners]
+                        .sort((a, b) =>
+                          a.name.localeCompare(b.name, undefined, {
+                            sensitivity: "base",
+                          }),
+                        )
+                        .map((partner) => (
+                          <option key={partner.id} value={partner.id}>
+                            {partner.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                ) : (
+                  <>
+                    <label className="field">
+                      <span>Type</span>
+                      <select
+                        value={saveRecipientType}
+                        onChange={(event) =>
+                          setSaveRecipientType(
+                            event.target.value as PartnerType,
+                          )
+                        }
+                      >
+                        <option value="business">Business</option>
+                        <option value="private">Private</option>
+                      </select>
+                    </label>
+
+                    <label className="field">
+                      <span>Name</span>
+                      <input
+                        value={saveRecipientName}
+                        onChange={(event) =>
+                          setSaveRecipientName(event.target.value)
+                        }
+                        placeholder="Partner name"
+                      />
+                    </label>
+                  </>
+                )}
+
+                <p className="hint">
+                  Wallet: {shortAddress(intent.destination)}
+                </p>
+
+                {saveRecipientMessage ? (
+                  <p className="hint">{saveRecipientMessage}</p>
+                ) : null}
+
+                <div className="actions">
+                  <button
+                    className="primaryButton"
+                    disabled={saveRecipientWorking}
+                    onClick={() => void saveUnknownRecipient()}
+                  >
+                    {saveRecipientWorking ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    className="secondaryButton"
+                    onClick={() => setSaveRecipientOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="actions">
+            <button className="primaryButton" onClick={reset}>
+              Send another
+            </button>
+          </div>
+        )}
       </section>
     );
   }
@@ -489,7 +716,7 @@ export default function SendPanel({
           </div>
           <div>
             <span>Recipient</span>
-            <strong className="breakWord">{selectedBeneficiary?.name ?? intent.destination}</strong>
+            <strong className="breakWord">{paymentRequestBusinessName ?? selectedPartner?.name ?? intent.destination}</strong>
           </div>
           <div>
             <span>Destination</span>
@@ -614,18 +841,52 @@ export default function SendPanel({
         isRelayRoute ? <p className="hint">Base payments currently use USDC.</p> : null
       )}
 
-      {beneficiaries.length ? (
+      {beneficiaryPartners.length ? (
         <label className="field">
-          <span>Saved beneficiary</span>
-          <select value="" onChange={(event) => {
-            if (event.target.value) setRecipient(event.target.value);
-          }}>
-            <option value="">Choose beneficiary…</option>
-            {beneficiaries.map((beneficiary) => (
-              <option key={beneficiary.id} value={beneficiary.address}>{beneficiary.name}</option>
+          <span>Saved partner</span>
+          <select
+            value={selectedPartnerId}
+            onChange={(event) => {
+              const id = event.target.value;
+              setSelectedPartnerId(id);
+              const partner = beneficiaryPartners.find((item) => item.id === id);
+              if (partner?.wallets[0]) setRecipient(partner.wallets[0].address);
+            }}
+          >
+            <option value="">Choose partner…</option>
+            {[...beneficiaryPartners]
+              .sort((a, b) =>
+                a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+              )
+              .map((partner) => (
+                <option key={partner.id} value={partner.id}>
+                  {partner.name} · {partner.partnerType === "business" ? "Business" : "Private"}
+                </option>
+              ))}
+          </select>
+        </label>
+      ) : null}
+
+      {selectedPartner && selectedPartner.wallets.length > 1 ? (
+        <label className="field">
+          <span>Partner wallet</span>
+          <select
+            value={recipient}
+            onChange={(event) => setRecipient(event.target.value)}
+          >
+            {selectedPartner.wallets.map((wallet) => (
+              <option key={wallet.id} value={wallet.address}>
+                {shortAddress(wallet.address)}
+              </option>
             ))}
           </select>
         </label>
+      ) : null}
+
+      {paymentRequestBusinessName ? (
+        <p className="hint">
+          Paying <strong>{paymentRequestBusinessName}</strong>
+        </p>
       ) : null}
 
       <label className="field">
@@ -647,7 +908,16 @@ export default function SendPanel({
         <input
           value={recipient}
           disabled={isTrackedRequest}
-          onChange={(event) => setRecipient(event.target.value.trim())}
+          onChange={(event) => {
+            const next = event.target.value.trim();
+            setRecipient(next);
+            const partner = beneficiaryPartners.find((item) =>
+              item.wallets.some(
+                (wallet) => wallet.address.toLowerCase() === next.toLowerCase(),
+              ),
+            );
+            setSelectedPartnerId(partner?.id ?? "");
+          }}
           placeholder="0x…"
           autoComplete="off"
         />

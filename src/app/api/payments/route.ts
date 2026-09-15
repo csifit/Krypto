@@ -17,6 +17,7 @@ function mapPayment(row: {
   status: string;
   settled_at: string;
   beneficiary_name: string | null;
+  beneficiary_partner_id: string | null;
   verified_at: string | null;
   settlement_block_number: string | number | null;
   chain_id: string | number | null;
@@ -29,6 +30,7 @@ function mapPayment(row: {
     status: row.status,
     settledAt: row.settled_at,
     beneficiaryName: row.beneficiary_name ?? undefined,
+    beneficiaryPartnerId: row.beneficiary_partner_id ?? undefined,
     verification:
       row.verified_at && row.settlement_block_number != null && row.chain_id != null
         ? {
@@ -52,7 +54,7 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase
       .from("payments")
-      .select("id, intent, quote, tx_hash, status, settled_at, beneficiary_name, verified_at, settlement_block_number, chain_id")
+      .select("id, intent, quote, tx_hash, status, settled_at, beneficiary_name, beneficiary_partner_id, verified_at, settlement_block_number, chain_id")
       .eq("privy_user_id", userId)
       .eq("network", ACTIVE_PAYMENT_NETWORK)
       .order("settled_at", { ascending: false })
@@ -113,6 +115,39 @@ export async function POST(request: Request) {
     await ensureProfile(userId, body.walletAddress);
     const supabase = getSupabaseAdmin();
 
+    if (record.beneficiaryPartnerId) {
+      const { data: partner, error: partnerError } = await supabase
+        .from("beneficiary_partners")
+        .select("id")
+        .eq("id", record.beneficiaryPartnerId)
+        .eq("privy_user_id", userId)
+        .maybeSingle();
+
+      if (partnerError) throw partnerError;
+      if (!partner) {
+        return Response.json(
+          { error: "Saved partner does not belong to this Krypto121 account" },
+          { status: 422 },
+        );
+      }
+
+      const { data: partnerWallet, error: walletError } = await supabase
+        .from("beneficiary_wallets")
+        .select("id")
+        .eq("partner_id", record.beneficiaryPartnerId)
+        .eq("privy_user_id", userId)
+        .ilike("address", record.intent.destination)
+        .maybeSingle();
+
+      if (walletError) throw walletError;
+      if (!partnerWallet) {
+        return Response.json(
+          { error: "Payment destination is not a wallet saved for this partner" },
+          { status: 422 },
+        );
+      }
+    }
+
     const { error } = await supabase.from("payments").upsert(
       {
         id: record.id,
@@ -127,6 +162,7 @@ export async function POST(request: Request) {
         source_amount: record.intent.sourceAmount,
         memo: record.intent.memo ?? null,
         beneficiary_name: record.beneficiaryName ?? null,
+        beneficiary_partner_id: record.beneficiaryPartnerId ?? null,
         tx_hash: record.txHash,
         status: "settled",
         intent: record.intent,

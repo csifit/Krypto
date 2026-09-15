@@ -110,7 +110,13 @@ export default function WalletDashboard({
       setShowReceive(false);
     }
 
-    if (requestedSection === "beneficiaries" || requestedSection === "business" || requestedSection === "requests" || requestedSection === "history" || requestedSection === "developer") {
+    if (
+      requestedSection === "beneficiaries" ||
+      requestedSection === "business" ||
+      requestedSection === "requests" ||
+      requestedSection === "history" ||
+      requestedSection === "developer"
+    ) {
       setActiveSection(requestedSection);
     }
   }, []);
@@ -152,7 +158,10 @@ export default function WalletDashboard({
       })
       .filter(
         (wallet, index, all) =>
-          all.findIndex((candidate) => candidate.address.toLowerCase() === wallet.address.toLowerCase()) === index,
+          all.findIndex(
+            (candidate) =>
+              candidate.address.toLowerCase() === wallet.address.toLowerCase(),
+          ) === index,
       );
   }, [embeddedWallet?.address, user?.linkedAccounts, wallets]);
 
@@ -167,10 +176,15 @@ export default function WalletDashboard({
     if (embeddedWallet?.address) {
       sources.push({
         id: `embedded-${embeddedWallet.address.toLowerCase()}`,
-        label: walletLabels[embeddedWallet.address.toLowerCase()] ?? "Krypto121 wallet",
+        label:
+          walletLabels[embeddedWallet.address.toLowerCase()] ??
+          "Krypto121 wallet",
         provider: "Privy",
         embedded: true,
-        wallet: createPrivyWalletProvider(embeddedWallet, ACTIVE_CELO_CHAIN.id),
+        wallet: createPrivyWalletProvider(
+          embeddedWallet,
+          ACTIVE_CELO_CHAIN.id,
+        ),
       });
     }
 
@@ -178,16 +192,21 @@ export default function WalletDashboard({
       if (!linked.connected) continue;
 
       const connected = wallets.find(
-        (wallet) => wallet.address.toLowerCase() === linked.address.toLowerCase(),
+        (wallet) =>
+          wallet.address.toLowerCase() === linked.address.toLowerCase(),
       );
       if (!connected) continue;
 
       sources.push({
         id: `linked-${linked.address.toLowerCase()}`,
-        label: walletLabels[linked.address.toLowerCase()] ?? linked.provider,
+        label:
+          walletLabels[linked.address.toLowerCase()] ?? linked.provider,
         provider: linked.provider,
         embedded: false,
-        wallet: createPrivyWalletProvider(connected, ACTIVE_CELO_CHAIN.id),
+        wallet: createPrivyWalletProvider(
+          connected,
+          ACTIVE_CELO_CHAIN.id,
+        ),
       });
     }
 
@@ -196,12 +215,21 @@ export default function WalletDashboard({
 
   const ownedWalletAddresses = useMemo<`0x${string}`[]>(() => {
     const addresses: `0x${string}`[] = [];
-    if (embeddedWallet?.address) addresses.push(embeddedWallet.address as `0x${string}`);
-    for (const wallet of linkedWallets) addresses.push(wallet.address);
+
+    if (embeddedWallet?.address) {
+      addresses.push(embeddedWallet.address as `0x${string}`);
+    }
+
+    for (const wallet of linkedWallets) {
+      addresses.push(wallet.address);
+    }
 
     return addresses.filter(
       (address, index, all) =>
-        all.findIndex((candidate) => candidate.toLowerCase() === address.toLowerCase()) === index,
+        all.findIndex(
+          (candidate) =>
+            candidate.toLowerCase() === address.toLowerCase(),
+        ) === index,
     );
   }, [embeddedWallet?.address, linkedWallets]);
 
@@ -218,16 +246,14 @@ export default function WalletDashboard({
 
       for (const asset of ACTIVE_STABLECOINS) {
         const value = Number(snapshot.stablecoins[asset.symbol] ?? "0");
-        if (Number.isFinite(value)) totals[asset.symbol] += value;
+        if (Number.isFinite(value)) {
+          totals[asset.symbol] += value;
+        }
       }
     }
 
     return totals;
   }, [ownedWalletAddresses, portfolio.balances]);
-
-  const balanceSummary = ACTIVE_STABLECOINS
-    .map((asset) => `${formatBalance(stablecoinTotals[asset.symbol] ?? 0)} ${asset.symbol}`)
-    .join(" · ");
 
   const embeddedBalance = walletProvider
     ? portfolio.balances[walletProvider.address.toLowerCase()]
@@ -239,7 +265,9 @@ export default function WalletDashboard({
     if (embeddedWallet?.address) {
       options.push({
         id: `embedded-${embeddedWallet.address.toLowerCase()}`,
-        label: walletLabels[embeddedWallet.address.toLowerCase()] ?? "Krypto121 wallet",
+        label:
+          walletLabels[embeddedWallet.address.toLowerCase()] ??
+          "Krypto121 wallet",
         address: embeddedWallet.address as `0x${string}`,
         detail: "Krypto121 wallet",
       });
@@ -248,7 +276,9 @@ export default function WalletDashboard({
     for (const wallet of linkedWallets) {
       options.push({
         id: `linked-${wallet.address.toLowerCase()}`,
-        label: walletLabels[wallet.address.toLowerCase()] ?? wallet.provider,
+        label:
+          walletLabels[wallet.address.toLowerCase()] ??
+          wallet.provider,
         address: wallet.address,
         detail: "Linked wallet",
       });
@@ -256,6 +286,30 @@ export default function WalletDashboard({
 
     return options;
   }, [embeddedWallet?.address, linkedWallets, walletLabels]);
+
+  const businessSetupNeedsAttention = useMemo(() => {
+    if (!businessProfile) return true;
+
+    if (
+      !businessProfile.defaultReceiveWallet ||
+      !businessProfile.defaultReceiveAsset
+    ) {
+      return true;
+    }
+
+    const walletStillAvailable = receiveWallets.some(
+      (wallet) =>
+        wallet.address.toLowerCase() ===
+        businessProfile.defaultReceiveWallet?.toLowerCase(),
+    );
+
+    const assetStillAvailable = ACTIVE_STABLECOINS.some(
+      (asset) =>
+        asset.symbol === businessProfile.defaultReceiveAsset,
+    );
+
+    return !walletStillAvailable || !assetStillAvailable;
+  }, [businessProfile, receiveWallets]);
 
   useEffect(() => {
     const walletAddress = walletProvider?.address;
@@ -274,9 +328,16 @@ export default function WalletDashboard({
       setBackendError(null);
 
       try {
-        const profileResult = await syncProfile(getAccessToken, address);
+        const profileResult = await syncProfile(
+          getAccessToken,
+          address,
+        );
 
-        const [nextBeneficiaryPartners, nextWalletLabels, nextBusinessProfile] = await Promise.all([
+        const [
+          nextBeneficiaryPartners,
+          nextWalletLabels,
+          nextBusinessProfile,
+        ] = await Promise.all([
           listBeneficiaryPartners(getAccessToken),
           listWalletLabels(getAccessToken),
           getBusinessProfile(getAccessToken),
@@ -286,6 +347,7 @@ export default function WalletDashboard({
           setAccountProfile(profileResult.profile);
           setBeneficiaryPartners(nextBeneficiaryPartners);
           setBusinessProfile(nextBusinessProfile);
+
           const labelMap: Record<string, string> = {};
           for (const item of nextWalletLabels) {
             labelMap[item.address.toLowerCase()] = item.label;
@@ -300,8 +362,6 @@ export default function WalletDashboard({
               : "Could not connect to Krypto121 backend",
           );
         }
-      } finally {
-        // Backend loading completes with the profile/wallet state above.
       }
     }
 
@@ -319,13 +379,20 @@ export default function WalletDashboard({
 
   async function copyWallet() {
     if (!walletProvider) return;
+
     await navigator.clipboard.writeText(walletProvider.address);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1400);
   }
 
   if (!ready || !walletsReady) {
-    return <main className="shell"><section className="panel"><p>Loading Krypto121…</p></section></main>;
+    return (
+      <main className="shell">
+        <section className="panel">
+          <p>Loading Krypto121…</p>
+        </section>
+      </main>
+    );
   }
 
   if (!authenticated) {
@@ -335,34 +402,60 @@ export default function WalletDashboard({
           <strong>Krypto121</strong>
           <ThemeToggle compact />
         </header>
+
         <section className="landingHero">
           <p className="eyebrow">Krypto121</p>
           <h1>Krypto121 is a smart payment-routing wallet.</h1>
           <p className="landingLead">
-            Create a wallet or bring the wallets you already use. Manage them from one place.
+            Create a wallet or bring the wallets you already use.
+            Manage them from one place.
           </p>
 
           {initialPaymentRequest ? (
             <div className="incomingPaymentRequest">
-              <span>{initialBusinessName ? `Pay ${initialBusinessName}` : "Payment request"}</span>
+              <span>
+                {initialBusinessName
+                  ? `Pay ${initialBusinessName}`
+                  : "Payment request"}
+              </span>
               <strong>
                 {initialPaymentRequest.amount
                   ? `${initialPaymentRequest.amount} ${initialPaymentRequest.asset}`
                   : `${initialPaymentRequest.asset} · amount to enter`}
               </strong>
-              <small>To {initialBusinessName ?? shortAddress(initialPaymentRequest.recipient)}</small>
-              {initialPaymentRequest.memo ? <small>Reference: {initialPaymentRequest.memo}</small> : null}
+              <small>
+                To{" "}
+                {initialBusinessName ??
+                  shortAddress(initialPaymentRequest.recipient)}
+              </small>
+              {initialPaymentRequest.memo ? (
+                <small>
+                  Reference: {initialPaymentRequest.memo}
+                </small>
+              ) : null}
             </div>
           ) : null}
 
-          <button className="primaryButton landingCta" onClick={login}>
+          <button
+            className="primaryButton landingCta"
+            onClick={login}
+          >
             Create account/Log in
           </button>
 
-          <div className="advantageStrip" aria-label="Why Krypto121">
-            <span><strong>Your wallets.</strong> One dashboard.</span>
-            <span><strong>Smart routing.</strong> Krypto121 finds the path.</span>
-            <span><strong>You approve.</strong> Funds stay under your control.</span>
+          <div
+            className="advantageStrip"
+            aria-label="Why Krypto121"
+          >
+            <span>
+              <strong>Your wallets.</strong> One dashboard.
+            </span>
+            <span>
+              <strong>Smart routing.</strong> Krypto121 finds the path.
+            </span>
+            <span>
+              <strong>You approve.</strong> Funds stay under your control.
+            </span>
           </div>
         </section>
       </main>
@@ -383,18 +476,32 @@ export default function WalletDashboard({
 
       <main className="dashboardMain">
         <header className="mobileTopbar">
-          <button className="hamburgerButton" onClick={() => setMenuOpen(true)} aria-label="Open menu">
-            <span /><span /><span />
+          <button
+            className="hamburgerButton"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <span />
+            <span />
+            <span />
           </button>
           <strong>Krypto121</strong>
           <ThemeToggle compact />
         </header>
 
-        <div className={activeSection ? "dashboardContent dashboardContentWithSide" : "dashboardContent"}>
+        <div
+          className={
+            activeSection
+              ? "dashboardContent dashboardContentWithSide"
+              : "dashboardContent"
+          }
+        >
           <div className="dashboardPrimary">
             <header className="dashboardHeading">
               <div>
-                <p className="eyebrow">Krypto121 · {ACTIVE_PRODUCT_LABEL}</p>
+                <p className="eyebrow">
+                  Krypto121 · {ACTIVE_PRODUCT_LABEL}
+                </p>
                 <h1 className="dashboardTitle">Overview</h1>
               </div>
             </header>
@@ -402,9 +509,16 @@ export default function WalletDashboard({
             <section className="dashboardCards">
               <article className="dashboardCard">
                 <span className="cardLabel">My wallet</span>
-                <strong className="walletAddressShort">{shortAddress(walletProvider?.address)}</strong>
+                <strong className="walletAddressShort">
+                  {shortAddress(walletProvider?.address)}
+                </strong>
+
                 <div className="cardActionsCompact">
-                  <button className="textButton" onClick={() => void copyWallet()} disabled={!walletProvider}>
+                  <button
+                    className="textButton"
+                    onClick={() => void copyWallet()}
+                    disabled={!walletProvider}
+                  >
                     {copied ? "Copied" : "Copy address"}
                   </button>
                 </div>
@@ -412,47 +526,79 @@ export default function WalletDashboard({
 
               <article className="dashboardCard">
                 <div className="cardHeaderCompact">
-                  <span className="cardLabel">Stablecoin balances</span>
-                  <button className="textButton" onClick={() => void refreshAll()}>Refresh</button>
+                  <span className="cardLabel">
+                    Stablecoin balances
+                  </span>
+                  <button
+                    className="textButton"
+                    onClick={() => void refreshAll()}
+                  >
+                    Refresh
+                  </button>
                 </div>
+
                 <strong className="balanceCompact stablecoinBalanceStack">
                   {portfolio.loading
                     ? "…"
                     : ACTIVE_STABLECOINS.map((asset) => (
                         <span key={asset.symbol}>
-                          {formatBalance(stablecoinTotals[asset.symbol] ?? 0)} {asset.symbol}
+                          {formatBalance(
+                            stablecoinTotals[asset.symbol] ?? 0,
+                          )}{" "}
+                          {asset.symbol}
                         </span>
                       ))}
                 </strong>
+
                 <span className="cardSubtle">
-                  {ownedWalletAddresses.length} owned {ownedWalletAddresses.length === 1 ? "wallet" : "wallets"} · {ACTIVE_ENVIRONMENT_LABEL}
+                  {ownedWalletAddresses.length} owned{" "}
+                  {ownedWalletAddresses.length === 1
+                    ? "wallet"
+                    : "wallets"}{" "}
+                  · {ACTIVE_ENVIRONMENT_LABEL}
                 </span>
               </article>
 
-              <article className="dashboardCard">
-                <span className="cardLabel">Business</span>
-                <strong className="cardActionTitle">
-                  {businessProfile?.businessName ?? "Set up business profile"}
-                </strong>
-                <span className="cardSubtle">
-                  {businessProfile?.defaultReceiveAsset
-                    ? `Default receive · ${businessProfile.defaultReceiveAsset}`
-                    : "Add payment identity and receive defaults"}
-                </span>
-                <div className="cardActionsCompact">
-                  <button className="textButton" onClick={() => setActiveSection("business")}>
-                    {businessProfile ? "Edit" : "Set up"}
-                  </button>
-                </div>
-              </article>
+              {businessSetupNeedsAttention ? (
+                <article className="dashboardCard">
+                  <span className="cardLabel">Business</span>
+
+                  <strong className="cardActionTitle">
+                    {businessProfile
+                      ? "Business setup needs attention"
+                      : "Set up business profile"}
+                  </strong>
+
+                  <span className="cardSubtle">
+                    {businessProfile
+                      ? "Review your receive preferences"
+                      : "Add payment identity and receive defaults"}
+                  </span>
+
+                  <div className="cardActionsCompact">
+                    <button
+                      className="textButton"
+                      onClick={() => setActiveSection("business")}
+                    >
+                      {businessProfile ? "Review" : "Set up"}
+                    </button>
+                  </div>
+                </article>
+              ) : null}
 
               <article className="dashboardCard">
                 <span className="cardLabel">Send / Receive</span>
-                <strong className="cardActionTitle">Move funds</strong>
+                <strong className="cardActionTitle">
+                  Move funds
+                </strong>
+
                 <div className="cardPrimaryActions">
                   <button
                     className="primaryButton"
-                    disabled={!walletProvider || accountProfile?.accountStatus !== "active"}
+                    disabled={
+                      !walletProvider ||
+                      accountProfile?.accountStatus !== "active"
+                    }
                     onClick={() => {
                       setShowSend((value) => !value);
                       setShowReceive(false);
@@ -460,6 +606,7 @@ export default function WalletDashboard({
                   >
                     Send
                   </button>
+
                   <button
                     className="secondaryButton"
                     disabled={!walletProvider}
@@ -474,15 +621,24 @@ export default function WalletDashboard({
               </article>
             </section>
 
-            {backendError ? <p className="errorText">Backend: {backendError}</p> : null}
+            {backendError ? (
+              <p className="errorText">
+                Backend: {backendError}
+              </p>
+            ) : null}
 
-            {accountProfile && accountProfile.accountStatus !== "active" ? (
-              <div className="accountRestrictionNotice" role="status">
+            {accountProfile &&
+            accountProfile.accountStatus !== "active" ? (
+              <div
+                className="accountRestrictionNotice"
+                role="status"
+              >
                 <strong>
                   {accountProfile.accountStatus === "blocked"
                     ? "Krypto121 actions are blocked"
                     : "Krypto121 payments are suspended"}
                 </strong>
+
                 <span>
                   {accountProfile.statusReason ??
                     "Payment and account-changing actions are temporarily unavailable."}
@@ -490,7 +646,9 @@ export default function WalletDashboard({
               </div>
             ) : null}
 
-            {showSend && walletProvider && accountProfile?.accountStatus === "active" ? (
+            {showSend &&
+            walletProvider &&
+            accountProfile?.accountStatus === "active" ? (
               <SendPanel
                 accountWalletAddress={walletProvider.address}
                 sourceWallets={paymentSources}
@@ -509,9 +667,15 @@ export default function WalletDashboard({
               <ReceivePanel
                 wallets={receiveWallets}
                 getAccessToken={getAccessToken}
-                onTrackedRequestCreated={() => setRequestRefreshKey((value) => value + 1)}
-                defaultWalletAddress={businessProfile?.defaultReceiveWallet}
-                defaultAssetSymbol={businessProfile?.defaultReceiveAsset}
+                onTrackedRequestCreated={() =>
+                  setRequestRefreshKey((value) => value + 1)
+                }
+                defaultWalletAddress={
+                  businessProfile?.defaultReceiveWallet
+                }
+                defaultAssetSymbol={
+                  businessProfile?.defaultReceiveAsset
+                }
                 businessName={businessProfile?.businessName}
               />
             ) : null}
@@ -520,31 +684,48 @@ export default function WalletDashboard({
           {activeSection ? (
             <aside className="secondarySideCard">
               <div className="sideCardHeader">
-                <button className="textButton" onClick={() => setActiveSection(null)}>Close</button>
+                <button
+                  className="textButton"
+                  onClick={() => setActiveSection(null)}
+                >
+                  Close
+                </button>
               </div>
 
-              {activeSection === "business" && walletProvider ? (
+              {activeSection === "business" &&
+              walletProvider ? (
                 <BusinessProfilePanel
                   wallets={receiveWallets}
                   accountEmail={accountProfile?.email}
                   profile={businessProfile}
                   onSaved={setBusinessProfile}
-                  readOnly={!accountProfile || accountProfile.accountStatus !== "active"}
+                  readOnly={
+                    !accountProfile ||
+                    accountProfile.accountStatus !== "active"
+                  }
                 />
               ) : null}
 
-              {activeSection === "requests" && walletProvider ? (
+              {activeSection === "requests" &&
+              walletProvider ? (
                 <PaymentRequestsPanel
                   refreshKey={requestRefreshKey}
-                  readOnly={!accountProfile || accountProfile.accountStatus !== "active"}
+                  readOnly={
+                    !accountProfile ||
+                    accountProfile.accountStatus !== "active"
+                  }
                 />
               ) : null}
 
-              {activeSection === "history" && walletProvider ? (
-                <PaymentHistory refreshKey={historyRefreshKey} />
+              {activeSection === "history" &&
+              walletProvider ? (
+                <PaymentHistory
+                  refreshKey={historyRefreshKey}
+                />
               ) : null}
 
-              {activeSection === "developer" && walletProvider ? (
+              {activeSection === "developer" &&
+              walletProvider ? (
                 <div className="developerSideContent">
                   {!IS_MAINNET ? (
                     <TestFundsPanel
@@ -553,28 +734,42 @@ export default function WalletDashboard({
                       onFunded={refreshAll}
                     />
                   ) : null}
+
                   <div className="developerFacts">
                     <div>
                       <span>Network</span>
-                      <strong>{ACTIVE_CELO_CHAIN.name}</strong>
+                      <strong>
+                        {ACTIVE_CELO_CHAIN.name}
+                      </strong>
                     </div>
+
                     <div>
                       <span>Assets</span>
-                      <strong>{ACTIVE_STABLECOINS.map((asset) => asset.symbol).join(" · ")}</strong>
+                      <strong>
+                        {ACTIVE_STABLECOINS.map(
+                          (asset) => asset.symbol,
+                        ).join(" · ")}
+                      </strong>
                     </div>
+
                     <div>
                       <span>Wallet provider</span>
                       <strong>Privy · replaceable</strong>
                     </div>
+
                     <div>
                       <span>Route</span>
                       <strong>Direct Celo</strong>
                     </div>
+
                     <div>
                       <span>Wallet explorer</span>
                       <a
                         className="textLink"
-                        href={getAddressExplorerUrl(ACTIVE_PAYMENT_NETWORK, walletProvider.address)}
+                        href={getAddressExplorerUrl(
+                          ACTIVE_PAYMENT_NETWORK,
+                          walletProvider.address,
+                        )}
                         target="_blank"
                         rel="noreferrer"
                       >

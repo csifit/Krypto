@@ -36,59 +36,112 @@ export default function DashboardSidebar({
 
   return (
     <>
-      {open ? <button className="sidebarBackdrop" aria-label="Close menu" onClick={onClose} /> : null}
-      <aside className={`dashboardSidebar${open ? " dashboardSidebarOpen" : ""}`}>
+      {open ? (
+        <button
+          className="sidebarBackdrop"
+          aria-label="Close menu"
+          onClick={onClose}
+        />
+      ) : null}
+
+      <aside
+        className={`dashboardSidebar${
+          open ? " dashboardSidebarOpen" : ""
+        }`}
+      >
         <div>
           <div className="sidebarBrand">
             <strong>Krypto121</strong>
             <span>Business</span>
           </div>
 
-          <nav className="sidebarNav" aria-label="Account navigation">
+          <nav
+            className="sidebarNav"
+            aria-label="Account navigation"
+          >
             <button
-              className={!activeSection ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}
+              className={
+                !activeSection
+                  ? "sidebarNavItem sidebarNavItemActive"
+                  : "sidebarNavItem"
+              }
               onClick={() => select(null)}
             >
               Overview
             </button>
+
             <button
-              className={activeSection === "wallets" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}
+              className={
+                activeSection === "wallets"
+                  ? "sidebarNavItem sidebarNavItemActive"
+                  : "sidebarNavItem"
+              }
               onClick={() => select("wallets")}
             >
               My wallets
             </button>
+
             <button
-              className={activeSection === "beneficiaries" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}
+              className={
+                activeSection === "beneficiaries"
+                  ? "sidebarNavItem sidebarNavItemActive"
+                  : "sidebarNavItem"
+              }
               onClick={() => select("beneficiaries")}
             >
               Beneficiaries
             </button>
+
             <button
-              className={activeSection === "business" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}
+              className={
+                activeSection === "business"
+                  ? "sidebarNavItem sidebarNavItemActive"
+                  : "sidebarNavItem"
+              }
               onClick={() => select("business")}
             >
               Business profile
             </button>
+
             <button
-              className={activeSection === "requests" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}
+              className={
+                activeSection === "requests"
+                  ? "sidebarNavItem sidebarNavItemActive"
+                  : "sidebarNavItem"
+              }
               onClick={() => select("requests")}
             >
               Payment requests
             </button>
+
             <button
-              className={activeSection === "history" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}
+              className={
+                activeSection === "history"
+                  ? "sidebarNavItem sidebarNavItemActive"
+                  : "sidebarNavItem"
+              }
               onClick={() => select("history")}
             >
               Payment history
             </button>
-            <button
-              className={activeSection === "developer" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}
-              onClick={() => select("developer")}
+
+            <a
+              className={
+                activeSection === "developer"
+                  ? "sidebarNavItem sidebarNavLink sidebarNavItemActive"
+                  : "sidebarNavItem sidebarNavLink"
+              }
+              href="/developer"
+              onClick={onClose}
             >
               Developer tools
-            </button>
+            </a>
+
             {isSuperAdmin ? (
-              <a className="sidebarNavItem sidebarNavLink" href="/admin">
+              <a
+                className="sidebarNavItem sidebarNavLink"
+                href="/admin"
+              >
                 Administration
               </a>
             ) : null}
@@ -97,11 +150,16 @@ export default function DashboardSidebar({
 
         <div className="sidebarFooter">
           <ThemeToggle />
+
           <div className="sidebarAccount">
             <span>{email ?? "Signed in"}</span>
             <small>{ACTIVE_ENVIRONMENT_LABEL}</small>
           </div>
-          <button className="sidebarSignOut" onClick={onLogout}>
+
+          <button
+            className="sidebarSignOut"
+            onClick={onLogout}
+          >
             Sign out
           </button>
         </div>

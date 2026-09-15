@@ -10,17 +10,13 @@ import PaymentHistory from "@/components/PaymentHistory";
 import PaymentRequestsPanel from "@/components/PaymentRequestsPanel";
 import ReceivePanel, { type ReceiveWalletOption } from "@/components/ReceivePanel";
 import SendPanel from "@/components/SendPanel";
-import TestFundsPanel from "@/components/TestFundsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useWalletPortfolio } from "@/hooks/useWalletPortfolio";
 import { ACTIVE_STABLECOINS } from "@/lib/assets";
 import {
   ACTIVE_CELO_CHAIN,
   ACTIVE_ENVIRONMENT_LABEL,
-  ACTIVE_PAYMENT_NETWORK,
   ACTIVE_PRODUCT_LABEL,
-  IS_MAINNET,
-  getAddressExplorerUrl,
 } from "@/lib/celo";
 import {
   listBeneficiaryPartners,
@@ -110,16 +106,20 @@ export default function WalletDashboard({
       setShowReceive(false);
     }
 
+    if (requestedSection === "developer") {
+      router.replace("/developer");
+      return;
+    }
+
     if (
       requestedSection === "beneficiaries" ||
       requestedSection === "business" ||
       requestedSection === "requests" ||
-      requestedSection === "history" ||
-      requestedSection === "developer"
+      requestedSection === "history"
     ) {
       setActiveSection(requestedSection);
     }
-  }, []);
+  }, [router]);
 
   function handleSidebar(section: SecondarySection) {
     if (section === "wallets") {
@@ -128,6 +128,10 @@ export default function WalletDashboard({
     }
     if (section === "beneficiaries") {
       router.push("/beneficiaries");
+      return;
+    }
+    if (section === "developer") {
+      router.push("/developer");
       return;
     }
     setActiveSection(section);
@@ -254,10 +258,6 @@ export default function WalletDashboard({
 
     return totals;
   }, [ownedWalletAddresses, portfolio.balances]);
-
-  const embeddedBalance = walletProvider
-    ? portfolio.balances[walletProvider.address.toLowerCase()]
-    : undefined;
 
   const receiveWallets = useMemo<ReceiveWalletOption[]>(() => {
     const options: ReceiveWalletOption[] = [];
@@ -724,61 +724,7 @@ export default function WalletDashboard({
                 />
               ) : null}
 
-              {activeSection === "developer" &&
-              walletProvider ? (
-                <div className="developerSideContent">
-                  {!IS_MAINNET ? (
-                    <TestFundsPanel
-                      wallet={walletProvider}
-                      celoBalance={embeddedBalance?.celo ?? "0"}
-                      onFunded={refreshAll}
-                    />
-                  ) : null}
 
-                  <div className="developerFacts">
-                    <div>
-                      <span>Network</span>
-                      <strong>
-                        {ACTIVE_CELO_CHAIN.name}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>Assets</span>
-                      <strong>
-                        {ACTIVE_STABLECOINS.map(
-                          (asset) => asset.symbol,
-                        ).join(" · ")}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>Wallet provider</span>
-                      <strong>Privy · replaceable</strong>
-                    </div>
-
-                    <div>
-                      <span>Route</span>
-                      <strong>Direct Celo</strong>
-                    </div>
-
-                    <div>
-                      <span>Wallet explorer</span>
-                      <a
-                        className="textLink"
-                        href={getAddressExplorerUrl(
-                          ACTIVE_PAYMENT_NETWORK,
-                          walletProvider.address,
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open technical view
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
             </aside>
           ) : null}
         </div>

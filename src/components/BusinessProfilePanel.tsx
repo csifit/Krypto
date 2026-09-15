@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import BusinessApiPanel from "@/components/BusinessApiPanel";
 import {
   listBusinessPaymentRequests,
   listPayments,
@@ -247,11 +246,6 @@ export default function BusinessProfilePanel({
           {saving ? "Saving…" : "Save business profile"}
         </button>
       </div>
-
-      <BusinessApiPanel
-        businessProfileReady={Boolean(profile)}
-        readOnly={readOnly}
-      />
 
       <div className="paymentRequestHeading">
         <div>

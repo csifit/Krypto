@@ -1,32 +1,51 @@
 # Krypto121 v0.25 — Business payment/API improvements
 
-Overlay for v0.24.
+This revised v0.25 replaces the earlier v0.25 package.
+
+## Developer tools
+
+Developer tools now has its own page:
+
+```text
+/developer
+```
+
+The existing sidebar item opens this page directly.
+
+The page contains:
+
+- Business API key management
+- Business payment API endpoint information
+- network information
+- supported assets
+- wallet provider information
+- technical wallet explorer link
+- test-fund controls when running on testnet
+
+API configuration is no longer shown inside Business profile.
+
+Business profile stays focused on:
+
+- business / trading name
+- country
+- business email
+- default receive wallet
+- default receive asset
+- compact business activity overview
 
 ## Business API key
 
 Each Krypto121 Business account can maintain one active Business API key.
 
-Key format:
-
-```text
-k121_live_...
-```
-
-or in testnet mode:
-
-```text
-k121_test_...
-```
-
 The full secret is shown only once when generated or rotated.
 
 Krypto121 stores only:
 
-- a display prefix;
-- SHA-256 hash;
-- created time;
-- last-used time;
-- revocation time.
+- display prefix
+- SHA-256 hash
+- created time
+- last-used time
+- revocation time
 
 ## Versioned Business payment API
 
@@ -48,20 +67,6 @@ Supported operations:
 - `GET ?externalReference=<value>` — read by external reference
 - `PATCH` — cancel a pending request
 
-## Create example
-
-```json
-{
-  "amount": "125.50",
-  "memo": "Invoice 1042",
-  "externalReference": "order-1042"
-}
-```
-
-If `recipient` and `asset` are omitted, Krypto121 uses the Business profile's default receive wallet and default receive asset.
-
-The response includes a ready-to-share `paymentUrl`.
-
 ## External reference
 
 `externalReference` is optional and unique per Krypto121 account.
@@ -70,19 +75,17 @@ Repeating the same create request with the same reference and identical payment 
 
 Reusing the reference with different payment facts returns HTTP 409.
 
-## No new environment variables
-
-The Business API key is generated and stored by Krypto121.
-
 ## Migration
 
-Apply:
+Migration 011 is unchanged:
 
 ```text
 supabase/migrations/202609150011_business_api.sql
 ```
 
-## Build
+## No new environment variables
+
+## Apply
 
 ```powershell
 npx supabase migration list

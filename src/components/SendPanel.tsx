@@ -31,6 +31,16 @@ function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
+function compactAmount(value?: string) {
+  if (!value) return undefined;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return value;
+  return number.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  });
+}
+
 export default function SendPanel({
   accountWalletAddress,
   sourceWallets,
@@ -65,6 +75,10 @@ export default function SendPanel({
 
   const selectedSource =
     sourceWallets.find((source) => source.id === sourceId) ?? sourceWallets[0];
+
+  // Celo fee-currency transactions are used for the Krypto121 embedded wallet.
+  // Linked external wallets retain their own wallet fee behavior for compatibility.
+  const payFeesInUsdt = Boolean(IS_MAINNET && selectedSource?.embedded);
 
   useEffect(() => {
     if (!initialRequest) return;
@@ -116,6 +130,7 @@ export default function SendPanel({
     sourceBalanceError: sourceBalance.error,
     recipient,
     amount,
+    payFeesInUsdt,
   });
 
   const validationError = useMemo(() => {
@@ -131,6 +146,18 @@ export default function SendPanel({
     }
     return null;
   }, [recipient, amount, sourceBalance.balance]);
+
+  const estimatedTotalDebit = useMemo(() => {
+    if (!payFeesInUsdt || !readiness.estimatedNetworkFeeAmount || !amount) {
+      return undefined;
+    }
+    const paymentAmount = Number(amount);
+    const feeAmount = Number(readiness.estimatedNetworkFeeAmount);
+    if (!Number.isFinite(paymentAmount) || !Number.isFinite(feeAmount)) {
+      return undefined;
+    }
+    return compactAmount(String(paymentAmount + feeAmount));
+  }, [amount, payFeesInUsdt, readiness.estimatedNetworkFeeAmount]);
 
   function selectBeneficiary(value: string) {
     if (!value) return;
@@ -169,7 +196,15 @@ export default function SendPanel({
         memo,
       });
       nextIntent.status = "quoted";
-      const nextQuote = quoteDirectCeloIntent(nextIntent);
+
+      const feeDescription =
+        payFeesInUsdt && readiness.estimatedNetworkFeeAmount
+          ? `Estimated ~${compactAmount(readiness.estimatedNetworkFeeAmount)} USDT`
+          : "Paid by the source wallet";
+
+      const nextQuote = quoteDirectCeloIntent(nextIntent, {
+        networkFeeDescription: feeDescription,
+      });
       setIntent(nextIntent);
       setQuote(nextQuote);
       setStage("review");
@@ -217,6 +252,7 @@ export default function SendPanel({
         executionSource.wallet,
         intent.destination,
         intent.sourceAmount,
+        { payFeesInUsdt: Boolean(IS_MAINNET && executionSource.embedded) },
       );
       intent.status = "settled";
 
@@ -290,6 +326,12 @@ export default function SendPanel({
               <span>Network</span>
               <strong>{ACTIVE_CELO_CHAIN.name}</strong>
             </div>
+            {IS_MAINNET && intentSource?.embedded ? (
+              <div>
+                <span>Network fee</span>
+                <strong>Paid in USDT</strong>
+              </div>
+            ) : null}
             <div>
               <span>Transaction ID</span>
               <strong className="breakWord">{hash}</strong>
@@ -333,8 +375,8 @@ export default function SendPanel({
             </strong>
           </div>
           <div>
-            <span>Route</span>
-            <strong>{quote.route.steps[0]?.description}</strong>
+            <span>Recipient gets</span>
+            <strong>{quote.destinationAmount} {ACTIVE_USDT.symbol}</strong>
           </div>
           <div>
             <span>Krypto121 fee</span>
@@ -344,6 +386,12 @@ export default function SendPanel({
             <span>Network fee</span>
             <strong>{quote.route.networkFeeDescription}</strong>
           </div>
+          {estimatedTotalDebit ? (
+            <div>
+              <span>Estimated total</span>
+              <strong>~{estimatedTotalDebit} USDT</strong>
+            </div>
+          ) : null}
           {intent.memo ? (
             <div>
               <span>Memo</span>
@@ -353,7 +401,9 @@ export default function SendPanel({
         </div>
 
         <p className="hint">
-          Krypto121 creates the route, but the selected source wallet must approve the transaction.
+          {IS_MAINNET && intentSource?.embedded
+            ? "Krypto121 pays the network fee from USDT in the same wallet. No separate CELO balance is required."
+            : "Krypto121 creates the route, but the selected source wallet must approve the transaction."}
         </p>
 
         {error ? <p className="errorText">{error}</p> : null}
@@ -495,7 +545,9 @@ export default function SendPanel({
 
         {readiness.network.state === "blocked" && readiness.route.state === "ready" ? (
           <p className="walletDirectoryNote">
-            This source wallet needs network fee funds before it can send. Krypto121 keeps the underlying network token out of the normal payment flow.
+            {payFeesInUsdt
+              ? "Keep a small amount of USDT available for the network fee."
+              : "This connected wallet needs network fee funds before it can send."}
           </p>
         ) : null}
       </div>
@@ -503,8 +555,8 @@ export default function SendPanel({
       <p className="hint">
         Available in selected wallet: {sourceBalance.loading ? "…" : sourceBalance.balance} {ACTIVE_USDT.symbol}
       </p>
-      {sourceBalance.error ? <p className="errorText">{sourceBalance.error}</p> : null}
       {validationError ? <p className="errorText">{validationError}</p> : null}
+      {sourceBalance.error ? <p className="errorText">{sourceBalance.error}</p> : null}
       {error ? <p className="errorText">{error}</p> : null}
 
       <div className="actions">
@@ -513,7 +565,7 @@ export default function SendPanel({
           onClick={review}
           disabled={!selectedSource || !readiness.ready}
         >
-          {readiness.checking ? "Checking payment…" : "Get route & review"}
+          {readiness.checking ? "Checking payment…" : "Review payment"}
         </button>
       </div>
     </section>

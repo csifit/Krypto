@@ -1,47 +1,6 @@
-import { defineChain } from "viem";
+import { celo, celoSepolia } from "viem/chains";
 
-export const celoSepolia = defineChain({
-  id: 11142220,
-  name: "Celo Sepolia",
-  nativeCurrency: {
-    name: "CELO",
-    symbol: "CELO",
-    decimals: 18,
-  },
-  rpcUrls: {
-    default: {
-      http: ["https://forno.celo-sepolia.celo-testnet.org"],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: "Celo Sepolia Blockscout",
-      url: "https://celo-sepolia.blockscout.com",
-    },
-  },
-  testnet: true,
-});
-
-export const celoMainnet = defineChain({
-  id: 42220,
-  name: "Celo Mainnet",
-  nativeCurrency: {
-    name: "CELO",
-    symbol: "CELO",
-    decimals: 18,
-  },
-  rpcUrls: {
-    default: {
-      http: ["https://forno.celo.org"],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: "CeloScan",
-      url: "https://celoscan.io",
-    },
-  },
-});
+export const celoMainnet = celo;
 
 // Publicly mintable development token on Celo Sepolia.
 // This is NOT real Tether and has no economic value.
@@ -68,6 +27,12 @@ export const CELO_MAINNET_USDT = {
   name: "Tether USD",
   decimals: 6,
   address: "0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e",
+} as const;
+
+// Celo fee-currency adapter for 6-decimal USDT.
+// Transfer USDT to the token address above; use this adapter only as feeCurrency.
+export const CELO_MAINNET_USDT_FEE_ADAPTER = {
+  address: "0x0E2A3e05bc9A16F5292A6170456A710cb89C6f72",
 } as const;
 
 export type KryptoNetworkMode = "testnet" | "mainnet";

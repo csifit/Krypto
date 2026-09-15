@@ -23,8 +23,17 @@ export function usePaymentReadiness(input: {
   sourceBalanceError: string | null;
   recipient: string;
   amount: string;
+  payFeesInUsdt?: boolean;
 }) {
-  const { sourceAddress, sourceBalance, sourceBalanceLoading, sourceBalanceError, recipient, amount } = input;
+  const {
+    sourceAddress,
+    sourceBalance,
+    sourceBalanceLoading,
+    sourceBalanceError,
+    recipient,
+    amount,
+    payFeesInUsdt = false,
+  } = input;
 
   const recipientReady = Boolean(recipient && isAddress(recipient));
   const numericAmount = Number(amount);
@@ -43,22 +52,27 @@ export function usePaymentReadiness(input: {
   const [routeState, setRouteState] = useState<ReadinessItem>(
     item("waiting", "Route", "Complete the payment details first"),
   );
+  const [estimatedNetworkFeeAmount, setEstimatedNetworkFeeAmount] =
+    useState<string | undefined>();
 
   useEffect(() => {
     if (!sourceAddress || !recipientReady || !amountValid || !fundsReady) {
       setNetworkState(item("waiting", "Network fees", "Complete the payment details first"));
       setRouteState(item("waiting", "Route", "Complete the payment details first"));
+      setEstimatedNetworkFeeAmount(undefined);
       return;
     }
 
     let cancelled = false;
     setNetworkState(item("checking", "Network fees", "Checking"));
     setRouteState(item("checking", "Route", "Checking"));
+    setEstimatedNetworkFeeAmount(undefined);
 
     void checkDirectTransferPreflight({
       sourceWallet: sourceAddress,
       recipient: recipient as `0x${string}`,
       amount,
+      payFeesInUsdt,
     }).then((result) => {
       if (cancelled) return;
 
@@ -69,15 +83,43 @@ export function usePaymentReadiness(input: {
       }
 
       setRouteState(item("ready", "Route", "Available"));
-      setNetworkState(
-        result.networkFeeReady
-          ? item("ready", "Network fees", "Ready")
-          : item("blocked", "Network fees", "Action required before sending"),
+      setEstimatedNetworkFeeAmount(
+        result.feeMode === "usdt" ? result.estimatedNetworkFeeAmount : undefined,
       );
+
+      if (result.networkFeeReady) {
+        setNetworkState(
+          item(
+            "ready",
+            "Network fees",
+            result.feeMode === "usdt" ? "Paid in USDT" : "Ready",
+          ),
+        );
+      } else {
+        setNetworkState(
+          item(
+            "blocked",
+            "Network fees",
+            result.feeMode === "usdt"
+              ? "Leave enough USDT to cover the network fee"
+              : "Action required before sending",
+          ),
+        );
+      }
     });
 
-    return () => { cancelled = true; };
-  }, [sourceAddress, recipient, recipientReady, amount, amountValid, fundsReady]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    sourceAddress,
+    recipient,
+    recipientReady,
+    amount,
+    amountValid,
+    fundsReady,
+    payFeesInUsdt,
+  ]);
 
   const recipientState = useMemo<ReadinessItem>(() => {
     if (!recipient) return item("waiting", "Recipient", "Enter a wallet address");
@@ -93,7 +135,15 @@ export function usePaymentReadiness(input: {
     if (sourceBalanceError) return item("blocked", "Funds", "Balance unavailable");
     if (numericAmount > Number(sourceBalance)) return item("blocked", "Funds", "Insufficient balance");
     return item("ready", "Funds", "Ready");
-  }, [sourceAddress, amount, amountValid, sourceBalanceLoading, sourceBalanceError, numericAmount, sourceBalance]);
+  }, [
+    sourceAddress,
+    amount,
+    amountValid,
+    sourceBalanceLoading,
+    sourceBalanceError,
+    numericAmount,
+    sourceBalance,
+  ]);
 
   const ready =
     recipientState.state === "ready" &&
@@ -106,5 +156,14 @@ export function usePaymentReadiness(input: {
     networkState.state === "checking" ||
     routeState.state === "checking";
 
-  return { recipient: recipientState, funds: fundsState, network: networkState, route: routeState, ready, checking };
+  return {
+    recipient: recipientState,
+    funds: fundsState,
+    network: networkState,
+    route: routeState,
+    ready,
+    checking,
+    estimatedNetworkFeeAmount,
+    networkFeeAsset: payFeesInUsdt ? "USDT" : undefined,
+  };
 }

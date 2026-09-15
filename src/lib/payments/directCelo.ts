@@ -50,12 +50,16 @@ export function createDirectCeloIntent(input: {
   };
 }
 
-export function quoteDirectCeloIntent(intent: PaymentIntent): PaymentQuote {
+export function quoteDirectCeloIntent(
+  intent: PaymentIntent,
+  options?: { networkFeeDescription?: string },
+): PaymentQuote {
   const route: PaymentRoute = {
     id: makeId("route"),
     kind: "direct-celo",
     kryptoFeeAmount: "0.00",
-    networkFeeDescription: "Paid by the source wallet",
+    networkFeeDescription:
+      options?.networkFeeDescription ?? "Paid by the source wallet",
     estimatedDurationSeconds: 15,
     steps: [
       {

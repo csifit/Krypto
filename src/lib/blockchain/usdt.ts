@@ -14,12 +14,16 @@ import {
 } from "viem";
 import {
   ACTIVE_CELO_CHAIN,
-  ACTIVE_USDT,
-  CELO_MAINNET_USDT_FEE_ADAPTER,
   CELO_SEPOLIA_TEST_USDT,
   IS_MAINNET,
   celoMainnet,
 } from "@/lib/celo";
+import {
+  DEFAULT_STABLECOIN,
+  requireActiveStablecoin,
+  type StablecoinSymbol,
+  type SupportedStablecoin,
+} from "@/lib/assets";
 import type { WalletProvider } from "@/lib/wallet/types";
 
 const publicClient = createPublicClient({
@@ -50,9 +54,7 @@ async function getCeloFeeCurrencyGasPrice(
 ): Promise<bigint> {
   const response = await fetch(celoMainnet.rpcUrls.default.http[0], {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       jsonrpc: "2.0",
       id: 1,
@@ -64,20 +66,15 @@ async function getCeloFeeCurrencyGasPrice(
 
   const body = (await response.json()) as {
     result?: Hex;
-    error?: {
-      code?: number;
-      message?: string;
-    };
+    error?: { code?: number; message?: string };
   };
 
   if (!response.ok) {
     throw new Error(`Celo RPC returned HTTP ${response.status}`);
   }
-
   if (body.error) {
     throw new Error(body.error.message || "Celo RPC rejected fee-currency gas price request");
   }
-
   if (!body.result) {
     throw new Error("Celo RPC did not return a fee-currency gas price");
   }
@@ -85,9 +82,12 @@ async function getCeloFeeCurrencyGasPrice(
   return hexToBigInt(body.result);
 }
 
-export async function readUsdtBalance(address: `0x${string}`) {
+export async function readStablecoinBalance(
+  address: `0x${string}`,
+  asset: SupportedStablecoin,
+) {
   const rawBalance = await publicClient.readContract({
-    address: ACTIVE_USDT.address,
+    address: asset.contractAddress,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [address],
@@ -95,13 +95,17 @@ export async function readUsdtBalance(address: `0x${string}`) {
 
   return {
     raw: rawBalance,
-    formatted: formatUnits(rawBalance, ACTIVE_USDT.decimals),
+    formatted: formatUnits(rawBalance, asset.decimals),
   };
+}
+
+// Compatibility for the test-funding and older balance hook.
+export async function readUsdtBalance(address: `0x${string}`) {
+  return readStablecoinBalance(address, DEFAULT_STABLECOIN);
 }
 
 export async function readCeloBalance(address: `0x${string}`) {
   const rawBalance = await publicClient.getBalance({ address });
-
   return {
     raw: rawBalance,
     formatted: formatEther(rawBalance),
@@ -111,20 +115,31 @@ export async function readCeloBalance(address: `0x${string}`) {
 export type DirectTransferPreflight = {
   routeAvailable: boolean;
   networkFeeReady: boolean;
-  feeMode: "usdt" | "native";
+  feeMode: "stablecoin" | "native";
+  feeAssetSymbol?: StablecoinSymbol;
   estimatedNetworkFeeAmount?: string;
   estimatedFeeWei?: bigint;
   requiredFeeWei?: bigint;
   error?: string;
 };
 
-async function checkUsdtFeePreflight(input: {
+async function checkStablecoinFeePreflight(input: {
   sourceWallet: `0x${string}`;
-  recipient: `0x${string}`;
   amount: string;
   transferData: Hex;
+  asset: SupportedStablecoin;
 }): Promise<DirectTransferPreflight> {
-  const adapter = CELO_MAINNET_USDT_FEE_ADAPTER.address;
+  const adapter = input.asset.feeCurrencyAdapter;
+
+  if (!adapter) {
+    return {
+      routeAvailable: false,
+      networkFeeReady: false,
+      feeMode: "stablecoin",
+      feeAssetSymbol: input.asset.symbol,
+      error: `${input.asset.symbol} cannot currently be used for network fees`,
+    };
+  }
 
   try {
     const gasPrice = await getCeloFeeCurrencyGasPrice(adapter);
@@ -132,7 +147,7 @@ async function checkUsdtFeePreflight(input: {
     const [gas, adaptedBalance] = await Promise.all([
       celoMainnetFeeClient.estimateGas({
         account: input.sourceWallet,
-        to: ACTIVE_USDT.address,
+        to: input.asset.contractAddress,
         data: input.transferData,
         feeCurrency: adapter,
       }),
@@ -146,16 +161,13 @@ async function checkUsdtFeePreflight(input: {
 
     const estimatedFeeWei = gas * gasPrice;
     const requiredFeeWei = (estimatedFeeWei * BigInt(125)) / BigInt(100);
-
-    // The fee adapter exposes a normalized 18-decimal balance for fee accounting.
     const transferAmount18 = parseUnits(input.amount, 18);
-    const networkFeeReady =
-      adaptedBalance >= transferAmount18 + requiredFeeWei;
 
     return {
       routeAvailable: true,
-      networkFeeReady,
-      feeMode: "usdt",
+      networkFeeReady: adaptedBalance >= transferAmount18 + requiredFeeWei,
+      feeMode: "stablecoin",
+      feeAssetSymbol: input.asset.symbol,
       estimatedNetworkFeeAmount: formatEther(estimatedFeeWei),
       estimatedFeeWei,
       requiredFeeWei,
@@ -164,8 +176,9 @@ async function checkUsdtFeePreflight(input: {
     return {
       routeAvailable: false,
       networkFeeReady: false,
-      feeMode: "usdt",
-      error: "Could not verify USDT network-fee readiness right now",
+      feeMode: "stablecoin",
+      feeAssetSymbol: input.asset.symbol,
+      error: `Could not verify ${input.asset.symbol} network-fee readiness right now`,
     };
   }
 }
@@ -174,17 +187,20 @@ export async function checkDirectTransferPreflight(input: {
   sourceWallet: `0x${string}`;
   recipient: `0x${string}`;
   amount: string;
-  payFeesInUsdt?: boolean;
+  assetSymbol: StablecoinSymbol;
+  payFeesInStablecoin?: boolean;
 }): Promise<DirectTransferPreflight> {
+  const asset = requireActiveStablecoin(input.assetSymbol);
   let rawAmount: bigint;
 
   try {
-    rawAmount = parseUnits(input.amount, ACTIVE_USDT.decimals);
+    rawAmount = parseUnits(input.amount, asset.decimals);
   } catch {
     return {
       routeAvailable: false,
       networkFeeReady: false,
-      feeMode: input.payFeesInUsdt ? "usdt" : "native",
+      feeMode: input.payFeesInStablecoin ? "stablecoin" : "native",
+      feeAssetSymbol: input.payFeesInStablecoin ? asset.symbol : undefined,
       error: "Enter a valid amount",
     };
   }
@@ -193,7 +209,8 @@ export async function checkDirectTransferPreflight(input: {
     return {
       routeAvailable: false,
       networkFeeReady: false,
-      feeMode: input.payFeesInUsdt ? "usdt" : "native",
+      feeMode: input.payFeesInStablecoin ? "stablecoin" : "native",
+      feeAssetSymbol: input.payFeesInStablecoin ? asset.symbol : undefined,
       error: "Amount must be greater than zero",
     };
   }
@@ -204,19 +221,19 @@ export async function checkDirectTransferPreflight(input: {
     args: [input.recipient, rawAmount],
   });
 
-  if (IS_MAINNET && input.payFeesInUsdt) {
-    return checkUsdtFeePreflight({
+  if (IS_MAINNET && input.payFeesInStablecoin) {
+    return checkStablecoinFeePreflight({
       sourceWallet: input.sourceWallet,
-      recipient: input.recipient,
       amount: input.amount,
       transferData,
+      asset,
     });
   }
 
   try {
     const [gas, gasPrice, nativeBalance] = await Promise.all([
       publicClient.estimateContractGas({
-        address: ACTIVE_USDT.address,
+        address: asset.contractAddress,
         abi: erc20Abi,
         functionName: "transfer",
         args: [input.recipient, rawAmount],
@@ -248,14 +265,14 @@ export async function checkDirectTransferPreflight(input: {
 
 async function sendContractTransaction(
   wallet: WalletProvider,
-  to: `0x${string}`,
+  asset: SupportedStablecoin,
   data: Hex,
-  payFeesInUsdt = false,
+  payFeesInStablecoin = false,
 ) {
   const provider = await wallet.getEip1193Provider();
   let hash: Hex;
 
-  if (IS_MAINNET && payFeesInUsdt) {
+  if (IS_MAINNET && payFeesInStablecoin && asset.feeCurrencyAdapter) {
     await wallet.switchChain(celoMainnet.id);
 
     const walletClient = createWalletClient({
@@ -266,10 +283,10 @@ async function sendContractTransaction(
 
     hash = await walletClient.sendTransaction({
       account: wallet.address,
-      to,
+      to: asset.contractAddress,
       data,
       value: BigInt(0),
-      feeCurrency: CELO_MAINNET_USDT_FEE_ADAPTER.address,
+      feeCurrency: asset.feeCurrencyAdapter,
     });
   } else {
     await wallet.switchChain(ACTIVE_CELO_CHAIN.id);
@@ -279,7 +296,7 @@ async function sendContractTransaction(
       params: [
         {
           from: wallet.address,
-          to,
+          to: asset.contractAddress,
           data,
           value: "0x0",
         },
@@ -289,12 +306,10 @@ async function sendContractTransaction(
     if (typeof result !== "string" || !result.startsWith("0x")) {
       throw new Error("Wallet did not return a transaction hash");
     }
-
     hash = result as Hex;
   }
 
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-
   if (receipt.status !== "success") {
     throw new Error(`Transaction failed on ${ACTIVE_CELO_CHAIN.name}`);
   }
@@ -317,26 +332,25 @@ export async function mintTestUsdt(
     args: [wallet.address, rawAmount],
   });
 
-  return sendContractTransaction(
-    wallet,
-    CELO_SEPOLIA_TEST_USDT.address,
-    data,
-  );
+  return sendContractTransaction(wallet, DEFAULT_STABLECOIN, data);
 }
 
-export async function sendUsdt(
+export async function sendStablecoin(
   wallet: WalletProvider,
   recipient: string,
   amount: string,
-  options?: { payFeesInUsdt?: boolean },
+  assetSymbol: StablecoinSymbol,
+  options?: { payFeesInStablecoin?: boolean },
 ) {
+  const asset = requireActiveStablecoin(assetSymbol);
+
   if (!isAddress(recipient)) {
     throw new Error("Enter a valid Celo/EVM wallet address");
   }
 
   let rawAmount: bigint;
   try {
-    rawAmount = parseUnits(amount, ACTIVE_USDT.decimals);
+    rawAmount = parseUnits(amount, asset.decimals);
   } catch {
     throw new Error("Enter a valid amount");
   }
@@ -345,9 +359,9 @@ export async function sendUsdt(
     throw new Error("Amount must be greater than zero");
   }
 
-  const balance = await readUsdtBalance(wallet.address);
+  const balance = await readStablecoinBalance(wallet.address, asset);
   if (rawAmount > balance.raw) {
-    throw new Error(`Insufficient ${ACTIVE_USDT.symbol} balance`);
+    throw new Error(`Insufficient ${asset.symbol} balance`);
   }
 
   const data = encodeFunctionData({
@@ -358,8 +372,24 @@ export async function sendUsdt(
 
   return sendContractTransaction(
     wallet,
-    ACTIVE_USDT.address,
+    asset,
     data,
-    Boolean(options?.payFeesInUsdt),
+    Boolean(options?.payFeesInStablecoin),
+  );
+}
+
+// Compatibility alias retained for any older direct callers.
+export async function sendUsdt(
+  wallet: WalletProvider,
+  recipient: string,
+  amount: string,
+  options?: { payFeesInUsdt?: boolean },
+) {
+  return sendStablecoin(
+    wallet,
+    recipient,
+    amount,
+    DEFAULT_STABLECOIN.symbol,
+    { payFeesInStablecoin: options?.payFeesInUsdt },
   );
 }

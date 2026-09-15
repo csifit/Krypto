@@ -6,8 +6,8 @@ import {
 import {
   ACTIVE_CELO_CHAIN,
   ACTIVE_PAYMENT_NETWORK,
-  ACTIVE_USDT,
 } from "@/lib/celo";
+import { stablecoinForPaymentAsset } from "@/lib/assets";
 import { getServerCeloPublicClient } from "@/lib/server/rpc";
 import type { LocalPaymentRecord } from "@/lib/payments/types";
 
@@ -43,17 +43,27 @@ function assertDirectCeloIntent(record: LocalPaymentRecord) {
     throw new Error("Unsupported settlement asset");
   }
 
+  const sourceAsset = stablecoinForPaymentAsset({
+    symbol: intent.sourceAsset.symbol,
+    network: intent.sourceAsset.network,
+    contractAddress: intent.sourceAsset.contractAddress,
+    decimals: intent.sourceAsset.decimals,
+  });
+
+  const destinationAsset = stablecoinForPaymentAsset({
+    symbol: intent.destinationAsset.symbol,
+    network: intent.destinationAsset.network,
+    contractAddress: intent.destinationAsset.contractAddress,
+    decimals: intent.destinationAsset.decimals,
+  });
+
   if (
-    intent.sourceAsset.network !== ACTIVE_PAYMENT_NETWORK ||
-    intent.destinationAsset.network !== ACTIVE_PAYMENT_NETWORK ||
-    !equalAddress(intent.sourceAsset.contractAddress, ACTIVE_USDT.address) ||
-    !equalAddress(intent.destinationAsset.contractAddress, ACTIVE_USDT.address) ||
-    intent.sourceAsset.decimals !== ACTIVE_USDT.decimals ||
-    intent.destinationAsset.decimals !== ACTIVE_USDT.decimals ||
-    intent.sourceAsset.symbol !== ACTIVE_USDT.symbol ||
-    intent.destinationAsset.symbol !== ACTIVE_USDT.symbol
+    !sourceAsset ||
+    !destinationAsset ||
+    sourceAsset.symbol !== destinationAsset.symbol ||
+    sourceAsset.network !== ACTIVE_PAYMENT_NETWORK
   ) {
-    throw new Error("Payment asset does not match the active Krypto121 environment");
+    throw new Error("Payment asset does not match a supported active Krypto121 stablecoin");
   }
 
   if (
@@ -62,12 +72,14 @@ function assertDirectCeloIntent(record: LocalPaymentRecord) {
   ) {
     throw new Error("Payment amounts do not match the quote");
   }
+
+  return sourceAsset;
 }
 
 export async function verifyDirectCeloSettlement(
   record: LocalPaymentRecord,
 ): Promise<VerifiedSettlement> {
-  assertDirectCeloIntent(record);
+  const asset = assertDirectCeloIntent(record);
 
   const publicClient = getServerCeloPublicClient();
   const [transaction, receipt] = await Promise.all([
@@ -83,7 +95,7 @@ export async function verifyDirectCeloSettlement(
     throw new Error("Blockchain source wallet does not match the payment");
   }
 
-  if (!transaction.to || !equalAddress(transaction.to, ACTIVE_USDT.address)) {
+  if (!transaction.to || !equalAddress(transaction.to, asset.contractAddress)) {
     throw new Error("Blockchain transaction used an unexpected token contract");
   }
 
@@ -106,10 +118,7 @@ export async function verifyDirectCeloSettlement(
   }
 
   const [recipient, rawAmount] = decoded.args as readonly [`0x${string}`, bigint];
-  const expectedAmount = parseUnits(
-    record.intent.sourceAmount,
-    ACTIVE_USDT.decimals,
-  );
+  const expectedAmount = parseUnits(record.intent.sourceAmount, asset.decimals);
 
   if (!equalAddress(recipient, record.intent.destination)) {
     throw new Error("Blockchain recipient does not match the payment");

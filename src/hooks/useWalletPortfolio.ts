@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { readCeloBalance, readUsdtBalance } from "@/lib/blockchain/usdt";
+import { ACTIVE_STABLECOINS } from "@/lib/assets";
+import { readCeloBalance, readStablecoinBalance } from "@/lib/blockchain/usdt";
 
 export type WalletBalanceSnapshot = {
   address: `0x${string}`;
-  usdt: string;
+  stablecoins: Record<string, string>;
   celo: string;
   error: string | null;
 };
@@ -48,21 +49,33 @@ export function useWalletPortfolio(addresses: `0x${string}`[]) {
     const results = await Promise.all(
       normalizedAddresses.map(async (address): Promise<WalletBalanceSnapshot> => {
         try {
-          const [usdt, celo] = await Promise.all([
-            readUsdtBalance(address),
+          const [stablecoinResults, celo] = await Promise.all([
+            Promise.all(
+              ACTIVE_STABLECOINS.map(async (asset) => ({
+                symbol: asset.symbol,
+                balance: (await readStablecoinBalance(address, asset)).formatted,
+              })),
+            ),
             readCeloBalance(address),
           ]);
 
+          const stablecoins: Record<string, string> = {};
+          for (const item of stablecoinResults) {
+            stablecoins[item.symbol] = item.balance;
+          }
+
           return {
             address,
-            usdt: usdt.formatted,
+            stablecoins,
             celo: celo.formatted,
             error: null,
           };
         } catch (error) {
           return {
             address,
-            usdt: "0",
+            stablecoins: Object.fromEntries(
+              ACTIVE_STABLECOINS.map((asset) => [asset.symbol, "0"]),
+            ),
             celo: "0",
             error: error instanceof Error ? error.message : "Could not read wallet balances",
           };

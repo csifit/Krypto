@@ -3,7 +3,12 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
-import { ACTIVE_USDT } from "@/lib/celo";
+import {
+  ACTIVE_STABLECOINS,
+  DEFAULT_STABLECOIN,
+  getActiveStablecoin,
+  type StablecoinSymbol,
+} from "@/lib/assets";
 import {
   buildPaymentRequestLink,
   createPaymentRequest,
@@ -26,6 +31,9 @@ export default function ReceivePanel({
   wallets: ReceiveWalletOption[];
 }) {
   const [selectedId, setSelectedId] = useState(wallets[0]?.id ?? "");
+  const [assetSymbol, setAssetSymbol] = useState<StablecoinSymbol>(
+    DEFAULT_STABLECOIN.symbol,
+  );
   const [copied, setCopied] = useState(false);
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
@@ -40,11 +48,10 @@ export default function ReceivePanel({
     () => wallets.find((wallet) => wallet.id === selectedId) ?? wallets[0],
     [selectedId, wallets],
   );
+  const selectedAsset = getActiveStablecoin(assetSymbol) ?? DEFAULT_STABLECOIN;
 
   useEffect(() => {
-    if (!selected && wallets[0]) {
-      setSelectedId(wallets[0].id);
-    }
+    if (!selected && wallets[0]) setSelectedId(wallets[0].id);
   }, [selected, wallets]);
 
   useEffect(() => {
@@ -60,7 +67,7 @@ export default function ReceivePanel({
     setQrDataUrl(null);
     setRequestError(null);
     setLinkCopied(false);
-  }, [selectedId]);
+  }, [selectedId, assetSymbol]);
 
   async function copyAddress() {
     if (!selected) return;
@@ -79,6 +86,7 @@ export default function ReceivePanel({
     try {
       const request = createPaymentRequest({
         recipient: selected.address,
+        asset: selectedAsset.symbol,
         amount,
         memo,
       });
@@ -115,8 +123,8 @@ export default function ReceivePanel({
     await navigator.share({
       title: "Krypto121 payment request",
       text: amount.trim()
-        ? `Payment request for ${amount.trim()} ${ACTIVE_USDT.symbol}`
-        : "Krypto121 payment request",
+        ? `Payment request for ${amount.trim()} ${selectedAsset.symbol}`
+        : `Krypto121 ${selectedAsset.symbol} payment request`,
       url: paymentLink,
     });
   }
@@ -133,7 +141,27 @@ export default function ReceivePanel({
   return (
     <section className="receivePanel">
       <p className="eyebrow">Receive funds</p>
-      <h2>Receive {ACTIVE_USDT.symbol}</h2>
+      <h2>Receive {selectedAsset.symbol}</h2>
+
+      {ACTIVE_STABLECOINS.length > 1 ? (
+        <label className="field">
+          <span>Asset</span>
+          <select
+            value={selectedAsset.symbol}
+            onChange={(event) => {
+              setAssetSymbol(event.target.value as StablecoinSymbol);
+              setAmount("");
+              setCopied(false);
+            }}
+          >
+            {ACTIVE_STABLECOINS.map((asset) => (
+              <option key={asset.symbol} value={asset.symbol}>
+                {asset.symbol} · {asset.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       {wallets.length > 1 ? (
         <label className="field">
@@ -155,7 +183,7 @@ export default function ReceivePanel({
       ) : null}
 
       <p className="hint">
-        {selected.detail ?? "Owned wallet"}. Share the address directly or create a QR/payment link.
+        {selected.detail ?? "Owned wallet"}. Share this Celo address for {selectedAsset.symbol}, or create a QR/payment link.
       </p>
 
       <p className="addressBox">{selected.address}</p>
@@ -187,7 +215,7 @@ export default function ReceivePanel({
               inputMode="decimal"
               placeholder="0.00"
             />
-            <strong>{ACTIVE_USDT.symbol}</strong>
+            <strong>{selectedAsset.symbol}</strong>
           </div>
         </label>
 
@@ -206,7 +234,7 @@ export default function ReceivePanel({
         </label>
 
         <p className="hint">
-          Leave the amount empty for a reusable QR. Add an amount/reference for a specific request.
+          The asset is included in the request. The payer cannot silently substitute a different stablecoin.
         </p>
 
         {requestError ? <p className="errorText">{requestError}</p> : null}
@@ -235,7 +263,11 @@ export default function ReceivePanel({
             </div>
 
             <div className="paymentRequestSummary">
-              <strong>{amount.trim() ? `${amount.trim()} ${ACTIVE_USDT.symbol}` : "Amount chosen by payer"}</strong>
+              <strong>
+                {amount.trim()
+                  ? `${amount.trim()} ${selectedAsset.symbol}`
+                  : `${selectedAsset.symbol} · amount chosen by payer`}
+              </strong>
               <span>To {selected.label} · {shortAddress(selected.address)}</span>
               {memo.trim() ? <span>Reference: {memo.trim()}</span> : null}
             </div>
@@ -252,7 +284,7 @@ export default function ReceivePanel({
             </div>
 
             <p className="walletDirectoryNote">
-              The QR contains a Krypto121 payment request. Scanning never sends funds automatically; the payer must review and approve the payment.
+              Scanning never sends funds automatically; the payer must review and approve the payment.
             </p>
           </div>
         ) : null}

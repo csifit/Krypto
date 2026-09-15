@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConnectWallet, useLinkAccount, usePrivy, useWallets } from "@privy-io/react-auth";
 import { isAddress } from "viem";
-import { ACTIVE_USDT } from "@/lib/celo";
+import { ACTIVE_STABLECOINS } from "@/lib/assets";
 import DashboardSidebar, { type SecondarySection } from "@/components/DashboardSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import WalletsPanel from "@/components/WalletsPanel";
@@ -126,11 +126,21 @@ export default function MyWalletsPage() {
     }, 0);
   }, [bitcoinAddresses, bitcoinPortfolio.balances]);
 
-  const ownedTotal = useMemo(() => {
-    return ownedAddresses.reduce((total, address) => {
-      const value = Number(portfolio.balances[address.toLowerCase()]?.usdt ?? "0");
-      return Number.isFinite(value) ? total + value : total;
-    }, 0);
+  const stablecoinTotals = useMemo(() => {
+    const totals: Record<string, number> = Object.fromEntries(
+      ACTIVE_STABLECOINS.map((asset) => [asset.symbol, 0]),
+    );
+
+    for (const address of ownedAddresses) {
+      const snapshot = portfolio.balances[address.toLowerCase()];
+      if (!snapshot) continue;
+      for (const asset of ACTIVE_STABLECOINS) {
+        const value = Number(snapshot.stablecoins[asset.symbol] ?? "0");
+        if (Number.isFinite(value)) totals[asset.symbol] += value;
+      }
+    }
+
+    return totals;
   }, [ownedAddresses, portfolio.balances]);
 
   useEffect(() => {
@@ -237,11 +247,7 @@ export default function MyWalletsPage() {
   }
 
   if (!ready || !walletsReady) {
-    return (
-      <main className="shell">
-        <section className="panel"><p>Loading Krypto121…</p></section>
-      </main>
-    );
+    return <main className="shell"><section className="panel"><p>Loading Krypto121…</p></section></main>;
   }
 
   if (!authenticated) {
@@ -263,6 +269,10 @@ export default function MyWalletsPage() {
     );
   }
 
+  const stablecoinSummary = ACTIVE_STABLECOINS
+    .map((asset) => `${formatBalance(stablecoinTotals[asset.symbol] ?? 0)} ${asset.symbol}`)
+    .join(" · ");
+
   return (
     <div className="dashboardApp">
       <DashboardSidebar
@@ -277,14 +287,8 @@ export default function MyWalletsPage() {
 
       <main className="dashboardMain">
         <header className="mobileTopbar">
-          <button
-            className="hamburgerButton"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
-          >
-            <span />
-            <span />
-            <span />
+          <button className="hamburgerButton" onClick={() => setMenuOpen(true)} aria-label="Open menu">
+            <span /><span /><span />
           </button>
           <strong>Krypto121</strong>
           <ThemeToggle compact />
@@ -300,7 +304,7 @@ export default function MyWalletsPage() {
               </p>
             </div>
             <div className="walletPageSummary">
-              <strong>{portfolio.loading ? "…" : formatBalance(ownedTotal)} {ACTIVE_USDT.symbol}</strong>
+              <strong>{portfolio.loading ? "…" : stablecoinSummary}</strong>
               <span>{ownedAddresses.length} owned {ownedAddresses.length === 1 ? "wallet" : "wallets"}</span>
               {bitcoinAddresses.length ? (
                 <span className="walletPageBitcoinSummary">

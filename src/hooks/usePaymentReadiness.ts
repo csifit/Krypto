@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { isAddress } from "viem";
+import type { StablecoinSymbol } from "@/lib/assets";
 import { checkDirectTransferPreflight } from "@/lib/blockchain/usdt";
 
 export type ReadinessState = "waiting" | "checking" | "ready" | "blocked";
@@ -23,7 +24,8 @@ export function usePaymentReadiness(input: {
   sourceBalanceError: string | null;
   recipient: string;
   amount: string;
-  payFeesInUsdt?: boolean;
+  assetSymbol: StablecoinSymbol;
+  payFeesInStablecoin?: boolean;
 }) {
   const {
     sourceAddress,
@@ -32,7 +34,8 @@ export function usePaymentReadiness(input: {
     sourceBalanceError,
     recipient,
     amount,
-    payFeesInUsdt = false,
+    assetSymbol,
+    payFeesInStablecoin = false,
   } = input;
 
   const recipientReady = Boolean(recipient && isAddress(recipient));
@@ -72,7 +75,8 @@ export function usePaymentReadiness(input: {
       sourceWallet: sourceAddress,
       recipient: recipient as `0x${string}`,
       amount,
-      payFeesInUsdt,
+      assetSymbol,
+      payFeesInStablecoin,
     }).then((result) => {
       if (cancelled) return;
 
@@ -84,7 +88,9 @@ export function usePaymentReadiness(input: {
 
       setRouteState(item("ready", "Route", "Available"));
       setEstimatedNetworkFeeAmount(
-        result.feeMode === "usdt" ? result.estimatedNetworkFeeAmount : undefined,
+        result.feeMode === "stablecoin"
+          ? result.estimatedNetworkFeeAmount
+          : undefined,
       );
 
       if (result.networkFeeReady) {
@@ -92,7 +98,9 @@ export function usePaymentReadiness(input: {
           item(
             "ready",
             "Network fees",
-            result.feeMode === "usdt" ? "Paid in USDT" : "Ready",
+            result.feeMode === "stablecoin"
+              ? `Paid in ${result.feeAssetSymbol ?? assetSymbol}`
+              : "Ready",
           ),
         );
       } else {
@@ -100,8 +108,8 @@ export function usePaymentReadiness(input: {
           item(
             "blocked",
             "Network fees",
-            result.feeMode === "usdt"
-              ? "Leave enough USDT to cover the network fee"
+            result.feeMode === "stablecoin"
+              ? `Leave enough ${result.feeAssetSymbol ?? assetSymbol} to cover the network fee`
               : "Action required before sending",
           ),
         );
@@ -118,7 +126,8 @@ export function usePaymentReadiness(input: {
     amount,
     amountValid,
     fundsReady,
-    payFeesInUsdt,
+    assetSymbol,
+    payFeesInStablecoin,
   ]);
 
   const recipientState = useMemo<ReadinessItem>(() => {
@@ -133,7 +142,7 @@ export function usePaymentReadiness(input: {
     if (!amountValid) return item("blocked", "Funds", "Enter a valid amount");
     if (sourceBalanceLoading) return item("checking", "Funds", "Checking balance");
     if (sourceBalanceError) return item("blocked", "Funds", "Balance unavailable");
-    if (numericAmount > Number(sourceBalance)) return item("blocked", "Funds", "Insufficient balance");
+    if (numericAmount > Number(sourceBalance)) return item("blocked", "Funds", `Insufficient ${assetSymbol}`);
     return item("ready", "Funds", "Ready");
   }, [
     sourceAddress,
@@ -143,6 +152,7 @@ export function usePaymentReadiness(input: {
     sourceBalanceError,
     numericAmount,
     sourceBalance,
+    assetSymbol,
   ]);
 
   const ready =
@@ -164,6 +174,5 @@ export function usePaymentReadiness(input: {
     ready,
     checking,
     estimatedNetworkFeeAmount,
-    networkFeeAsset: payFeesInUsdt ? "USDT" : undefined,
   };
 }

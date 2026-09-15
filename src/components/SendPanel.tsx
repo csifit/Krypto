@@ -6,12 +6,17 @@ import { isAddress } from "viem";
 import {
   ACTIVE_CELO_CHAIN,
   ACTIVE_PAYMENT_NETWORK,
-  ACTIVE_USDT,
   IS_MAINNET,
   getTransactionExplorerUrl,
 } from "@/lib/celo";
-import { sendUsdt } from "@/lib/blockchain/usdt";
-import { useUsdtBalance } from "@/hooks/useUsdtBalance";
+import {
+  ACTIVE_STABLECOINS,
+  DEFAULT_STABLECOIN,
+  getActiveStablecoin,
+  type StablecoinSymbol,
+} from "@/lib/assets";
+import { sendStablecoin } from "@/lib/blockchain/usdt";
+import { useStablecoinBalance } from "@/hooks/useStablecoinBalance";
 import { usePaymentReadiness } from "@/hooks/usePaymentReadiness";
 import {
   createDirectCeloIntent,
@@ -56,8 +61,9 @@ export default function SendPanel({
   initialSourceAddress?: `0x${string}`;
   onSent(): Promise<void>;
 }) {
-  const [sourceId, setSourceId] = useState(
-    sourceWallets[0]?.id ?? "",
+  const [sourceId, setSourceId] = useState(sourceWallets[0]?.id ?? "");
+  const [assetSymbol, setAssetSymbol] = useState<StablecoinSymbol>(
+    initialRequest?.asset ?? DEFAULT_STABLECOIN.symbol,
   );
   const [recipient, setRecipient] = useState(initialRequest?.recipient ?? "");
   const [amount, setAmount] = useState(initialRequest?.amount ?? "");
@@ -65,9 +71,7 @@ export default function SendPanel({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [intent, setIntent] = useState<PaymentIntent | null>(null);
   const [quote, setQuote] = useState<PaymentQuote | null>(null);
-  const [stage, setStage] = useState<"form" | "review" | "sending" | "success">(
-    "form",
-  );
+  const [stage, setStage] = useState<"form" | "review" | "sending" | "success">("form");
   const [error, setError] = useState<string | null>(null);
   const [hash, setHash] = useState<`0x${string}` | null>(null);
   const [recordWarning, setRecordWarning] = useState<string | null>(null);
@@ -75,14 +79,17 @@ export default function SendPanel({
 
   const selectedSource =
     sourceWallets.find((source) => source.id === sourceId) ?? sourceWallets[0];
-
-  // Celo fee-currency transactions are used for the Krypto121 embedded wallet.
-  // Linked external wallets retain their own wallet fee behavior for compatibility.
-  const payFeesInUsdt = Boolean(IS_MAINNET && selectedSource?.embedded);
+  const selectedAsset = getActiveStablecoin(assetSymbol) ?? DEFAULT_STABLECOIN;
+  const payFeesInStablecoin = Boolean(
+    IS_MAINNET &&
+    selectedSource?.embedded &&
+    selectedAsset.feeCurrencyAdapter,
+  );
 
   useEffect(() => {
     if (!initialRequest) return;
     setRecipient(initialRequest.recipient);
+    setAssetSymbol(initialRequest.asset);
     setAmount(initialRequest.amount ?? "");
     setMemo(initialRequest.memo ?? "");
     setError(null);
@@ -108,6 +115,7 @@ export default function SendPanel({
     }
 
     setRecipient(request.recipient);
+    setAssetSymbol(request.asset);
     setAmount(request.amount ?? "");
     setMemo(request.memo ?? "");
     setScannerOpen(false);
@@ -117,7 +125,10 @@ export default function SendPanel({
     setStage("form");
   }
 
-  const sourceBalance = useUsdtBalance(selectedSource?.wallet.address);
+  const sourceBalance = useStablecoinBalance(
+    selectedSource?.wallet.address,
+    selectedAsset,
+  );
 
   const selectedBeneficiary = beneficiaries.find(
     (item) => item.address.toLowerCase() === recipient.toLowerCase(),
@@ -130,7 +141,8 @@ export default function SendPanel({
     sourceBalanceError: sourceBalance.error,
     recipient,
     amount,
-    payFeesInUsdt,
+    assetSymbol: selectedAsset.symbol,
+    payFeesInStablecoin,
   });
 
   const validationError = useMemo(() => {
@@ -142,13 +154,13 @@ export default function SendPanel({
       return "Amount must be greater than zero";
     }
     if (number > Number(sourceBalance.balance)) {
-      return "Amount exceeds the selected wallet balance";
+      return `Amount exceeds the selected wallet ${selectedAsset.symbol} balance`;
     }
     return null;
-  }, [recipient, amount, sourceBalance.balance]);
+  }, [recipient, amount, sourceBalance.balance, selectedAsset.symbol]);
 
   const estimatedTotalDebit = useMemo(() => {
-    if (!payFeesInUsdt || !readiness.estimatedNetworkFeeAmount || !amount) {
+    if (!payFeesInStablecoin || !readiness.estimatedNetworkFeeAmount || !amount) {
       return undefined;
     }
     const paymentAmount = Number(amount);
@@ -157,12 +169,7 @@ export default function SendPanel({
       return undefined;
     }
     return compactAmount(String(paymentAmount + feeAmount));
-  }, [amount, payFeesInUsdt, readiness.estimatedNetworkFeeAmount]);
-
-  function selectBeneficiary(value: string) {
-    if (!value) return;
-    setRecipient(value);
-  }
+  }, [amount, payFeesInStablecoin, readiness.estimatedNetworkFeeAmount]);
 
   function review() {
     setError(null);
@@ -193,18 +200,20 @@ export default function SendPanel({
         sourceWallet: selectedSource.wallet.address,
         destination: recipient,
         amount,
+        assetSymbol: selectedAsset.symbol,
         memo,
       });
       nextIntent.status = "quoted";
 
       const feeDescription =
-        payFeesInUsdt && readiness.estimatedNetworkFeeAmount
-          ? `Estimated ~${compactAmount(readiness.estimatedNetworkFeeAmount)} USDT`
+        payFeesInStablecoin && readiness.estimatedNetworkFeeAmount
+          ? `Estimated ~${compactAmount(readiness.estimatedNetworkFeeAmount)} ${selectedAsset.symbol}`
           : "Paid by the source wallet";
 
       const nextQuote = quoteDirectCeloIntent(nextIntent, {
         networkFeeDescription: feeDescription,
       });
+
       setIntent(nextIntent);
       setQuote(nextQuote);
       setStage("review");
@@ -214,7 +223,7 @@ export default function SendPanel({
   }
 
   async function confirm() {
-    if (!intent || !quote) return;
+    if (!intent || !quote || intent.sourceAsset.type !== "crypto") return;
 
     if (new Date(quote.expiresAt).getTime() <= Date.now()) {
       setError("This quote expired. Review the payment again.");
@@ -233,6 +242,13 @@ export default function SendPanel({
       return;
     }
 
+    const executionAsset = getActiveStablecoin(intent.sourceAsset.symbol);
+    if (!executionAsset) {
+      setError("The payment asset is no longer supported.");
+      setStage("form");
+      return;
+    }
+
     setStage("sending");
     setError(null);
 
@@ -241,18 +257,22 @@ export default function SendPanel({
         accountWalletAddress,
         sourceWallet: executionSource.wallet.address,
         amount: intent.sourceAmount,
-        network:
-          intent.sourceAsset.type === "crypto"
-            ? intent.sourceAsset.network
-            : ACTIVE_PAYMENT_NETWORK,
+        network: intent.sourceAsset.network,
       });
 
       intent.status = "executing";
-      const txHash = await sendUsdt(
+      const txHash = await sendStablecoin(
         executionSource.wallet,
         intent.destination,
         intent.sourceAmount,
-        { payFeesInUsdt: Boolean(IS_MAINNET && executionSource.embedded) },
+        executionAsset.symbol,
+        {
+          payFeesInStablecoin: Boolean(
+            IS_MAINNET &&
+            executionSource.embedded &&
+            executionAsset.feeCurrencyAdapter,
+          ),
+        },
       );
       intent.status = "settled";
 
@@ -282,12 +302,17 @@ export default function SendPanel({
     } catch (err) {
       intent.status = "failed";
       setStage("review");
-      setError(err instanceof Error ? err.message : `Could not send ${ACTIVE_USDT.symbol}`);
+      setError(
+        err instanceof Error
+          ? err.message
+          : `Could not send ${selectedAsset.symbol}`,
+      );
     }
   }
 
   function reset() {
     setRecipient("");
+    setAssetSymbol(DEFAULT_STABLECOIN.symbol);
     setAmount("");
     setMemo("");
     setIntent(null);
@@ -304,6 +329,10 @@ export default function SendPanel({
         (source) => source.wallet.address.toLowerCase() === intent.sourceWallet.toLowerCase(),
       )
     : undefined;
+  const intentSymbol =
+    intent?.sourceAsset.type === "crypto"
+      ? intent.sourceAsset.symbol
+      : selectedAsset.symbol;
 
   if (stage === "success" && hash && intent) {
     return (
@@ -311,7 +340,7 @@ export default function SendPanel({
         <span className="status">Settled</span>
         <h2>Payment sent</h2>
         <p>
-          {intent.sourceAmount} {ACTIVE_USDT.symbol} was confirmed through Krypto121&apos;s direct
+          {intent.sourceAmount} {intentSymbol} was confirmed through Krypto121&apos;s direct
           route on {ACTIVE_CELO_CHAIN.name}.{!IS_MAINNET ? " No real money was used." : ""}
         </p>
         <p className="hint">
@@ -319,6 +348,7 @@ export default function SendPanel({
         </p>
         {intent.memo ? <p className="hint">Memo: {intent.memo}</p> : null}
         {recordWarning ? <p className="errorText">{recordWarning}</p> : null}
+
         <details className="technicalDetails">
           <summary>Technical details</summary>
           <div className="technicalDetailsBody">
@@ -326,10 +356,14 @@ export default function SendPanel({
               <span>Network</span>
               <strong>{ACTIVE_CELO_CHAIN.name}</strong>
             </div>
+            <div>
+              <span>Asset</span>
+              <strong>{intentSymbol}</strong>
+            </div>
             {IS_MAINNET && intentSource?.embedded ? (
               <div>
                 <span>Network fee</span>
-                <strong>Paid in USDT</strong>
+                <strong>Paid in {intentSymbol}</strong>
               </div>
             ) : null}
             <div>
@@ -346,6 +380,7 @@ export default function SendPanel({
             </a>
           </div>
         </details>
+
         <div className="actions">
           <button className="primaryButton" onClick={reset}>
             Send another
@@ -359,7 +394,7 @@ export default function SendPanel({
     return (
       <section className="sendPanel">
         <p className="eyebrow">Payment intent quoted</p>
-        <h2>{quote.destinationAmount} {ACTIVE_USDT.symbol}</h2>
+        <h2>{quote.destinationAmount} {intentSymbol}</h2>
 
         <div className="reviewRows">
           <div>
@@ -376,11 +411,11 @@ export default function SendPanel({
           </div>
           <div>
             <span>Recipient gets</span>
-            <strong>{quote.destinationAmount} {ACTIVE_USDT.symbol}</strong>
+            <strong>{quote.destinationAmount} {intentSymbol}</strong>
           </div>
           <div>
             <span>Krypto121 fee</span>
-            <strong>{quote.route.kryptoFeeAmount} {ACTIVE_USDT.symbol}</strong>
+            <strong>{quote.route.kryptoFeeAmount} {intentSymbol}</strong>
           </div>
           <div>
             <span>Network fee</span>
@@ -389,7 +424,7 @@ export default function SendPanel({
           {estimatedTotalDebit ? (
             <div>
               <span>Estimated total</span>
-              <strong>~{estimatedTotalDebit} USDT</strong>
+              <strong>~{estimatedTotalDebit} {intentSymbol}</strong>
             </div>
           ) : null}
           {intent.memo ? (
@@ -402,7 +437,7 @@ export default function SendPanel({
 
         <p className="hint">
           {IS_MAINNET && intentSource?.embedded
-            ? "Krypto121 pays the network fee from USDT in the same wallet. No separate CELO balance is required."
+            ? `Krypto121 pays the network fee from ${intentSymbol} in the same wallet. No separate CELO balance is required.`
             : "Krypto121 creates the route, but the selected source wallet must approve the transaction."}
         </p>
 
@@ -450,14 +485,34 @@ export default function SendPanel({
         </select>
       </label>
 
-      <p className="hint">
-        Only connected wallets that can sign are listed. Watch-only wallets can never be a payment source.
-      </p>
+      {ACTIVE_STABLECOINS.length > 1 ? (
+        <label className="field">
+          <span>Asset</span>
+          <select
+            value={selectedAsset.symbol}
+            onChange={(event) => {
+              setAssetSymbol(event.target.value as StablecoinSymbol);
+              setAmount("");
+              setIntent(null);
+              setQuote(null);
+              setError(null);
+            }}
+          >
+            {ACTIVE_STABLECOINS.map((asset) => (
+              <option key={asset.symbol} value={asset.symbol}>
+                {asset.symbol} · {asset.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       {beneficiaries.length ? (
         <label className="field">
           <span>Saved beneficiary</span>
-          <select value="" onChange={(event) => selectBeneficiary(event.target.value)}>
+          <select value="" onChange={(event) => {
+            if (event.target.value) setRecipient(event.target.value);
+          }}>
             <option value="">Choose beneficiary…</option>
             {beneficiaries.map((beneficiary) => (
               <option key={beneficiary.id} value={beneficiary.address}>
@@ -506,7 +561,7 @@ export default function SendPanel({
             inputMode="decimal"
             placeholder="0.00"
           />
-          <strong>{ACTIVE_USDT.symbol}</strong>
+          <strong>{selectedAsset.symbol}</strong>
         </div>
       </label>
 
@@ -545,15 +600,15 @@ export default function SendPanel({
 
         {readiness.network.state === "blocked" && readiness.route.state === "ready" ? (
           <p className="walletDirectoryNote">
-            {payFeesInUsdt
-              ? "Keep a small amount of USDT available for the network fee."
+            {payFeesInStablecoin
+              ? `Keep a small amount of ${selectedAsset.symbol} available for the network fee.`
               : "This connected wallet needs network fee funds before it can send."}
           </p>
         ) : null}
       </div>
 
       <p className="hint">
-        Available in selected wallet: {sourceBalance.loading ? "…" : sourceBalance.balance} {ACTIVE_USDT.symbol}
+        Available in selected wallet: {sourceBalance.loading ? "…" : sourceBalance.balance} {selectedAsset.symbol}
       </p>
       {validationError ? <p className="errorText">{validationError}</p> : null}
       {sourceBalance.error ? <p className="errorText">{sourceBalance.error}</p> : null}

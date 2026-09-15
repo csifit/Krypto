@@ -12,12 +12,12 @@ import SendPanel from "@/components/SendPanel";
 import TestFundsPanel from "@/components/TestFundsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useWalletPortfolio } from "@/hooks/useWalletPortfolio";
+import { ACTIVE_STABLECOINS } from "@/lib/assets";
 import {
   ACTIVE_CELO_CHAIN,
   ACTIVE_ENVIRONMENT_LABEL,
   ACTIVE_PAYMENT_NETWORK,
   ACTIVE_PRODUCT_LABEL,
-  ACTIVE_USDT,
   IS_MAINNET,
   getAddressExplorerUrl,
 } from "@/lib/celo";
@@ -40,9 +40,9 @@ function shortAddress(address?: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-function formatBalance(value: string) {
+function formatBalance(value: string | number) {
   const number = Number(value);
-  if (!Number.isFinite(number)) return value;
+  if (!Number.isFinite(number)) return String(value);
   return number.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 6,
@@ -84,7 +84,6 @@ export default function WalletDashboard({
   const [copied, setCopied] = useState(false);
   const [initialSourceAddress, setInitialSourceAddress] = useState<`0x${string}` | undefined>();
 
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedSource = params.get("payFrom");
@@ -109,9 +108,7 @@ export default function WalletDashboard({
     setActiveSection(section);
   }
 
-  const embeddedWallet = wallets.find(
-    (wallet) => wallet.walletClientType === "privy",
-  );
+  const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === "privy");
 
   const linkedWallets = useMemo<LinkedWalletView[]>(() => {
     const embeddedAddress = embeddedWallet?.address?.toLowerCase();
@@ -151,8 +148,7 @@ export default function WalletDashboard({
     if (embeddedWallet?.address) {
       sources.push({
         id: `embedded-${embeddedWallet.address.toLowerCase()}`,
-        label:
-          walletLabels[embeddedWallet.address.toLowerCase()] ?? "Krypto121 wallet",
+        label: walletLabels[embeddedWallet.address.toLowerCase()] ?? "Krypto121 wallet",
         provider: "Privy",
         embedded: true,
         wallet: createPrivyWalletProvider(embeddedWallet, ACTIVE_CELO_CHAIN.id),
@@ -188,17 +184,31 @@ export default function WalletDashboard({
       (address, index, all) =>
         all.findIndex((candidate) => candidate.toLowerCase() === address.toLowerCase()) === index,
     );
-  }, [embeddedWallet?.address, linkedWallets, walletLabels]);
+  }, [embeddedWallet?.address, linkedWallets]);
 
   const portfolio = useWalletPortfolio(ownedWalletAddresses);
 
-  const ownedUsdtTotal = useMemo(() => {
-    return ownedWalletAddresses.reduce((total, address) => {
-      const balance = portfolio.balances[address.toLowerCase()]?.usdt ?? "0";
-      const number = Number(balance);
-      return Number.isFinite(number) ? total + number : total;
-    }, 0);
+  const stablecoinTotals = useMemo(() => {
+    const totals: Record<string, number> = Object.fromEntries(
+      ACTIVE_STABLECOINS.map((asset) => [asset.symbol, 0]),
+    );
+
+    for (const address of ownedWalletAddresses) {
+      const snapshot = portfolio.balances[address.toLowerCase()];
+      if (!snapshot) continue;
+
+      for (const asset of ACTIVE_STABLECOINS) {
+        const value = Number(snapshot.stablecoins[asset.symbol] ?? "0");
+        if (Number.isFinite(value)) totals[asset.symbol] += value;
+      }
+    }
+
+    return totals;
   }, [ownedWalletAddresses, portfolio.balances]);
+
+  const balanceSummary = ACTIVE_STABLECOINS
+    .map((asset) => `${formatBalance(stablecoinTotals[asset.symbol] ?? 0)} ${asset.symbol}`)
+    .join(" · ");
 
   const embeddedBalance = walletProvider
     ? portfolio.balances[walletProvider.address.toLowerCase()]
@@ -210,8 +220,7 @@ export default function WalletDashboard({
     if (embeddedWallet?.address) {
       options.push({
         id: `embedded-${embeddedWallet.address.toLowerCase()}`,
-        label:
-          walletLabels[embeddedWallet.address.toLowerCase()] ?? "Krypto121 wallet",
+        label: walletLabels[embeddedWallet.address.toLowerCase()] ?? "Krypto121 wallet",
         address: embeddedWallet.address as `0x${string}`,
         detail: "Krypto121 wallet",
       });
@@ -271,9 +280,7 @@ export default function WalletDashboard({
           );
         }
       } finally {
-        if (!cancelled) {
-          setBeneficiariesLoading(false);
-        }
+        if (!cancelled) setBeneficiariesLoading(false);
       }
     }
 
@@ -299,7 +306,6 @@ export default function WalletDashboard({
     setBeneficiaries((current) => current.filter((item) => item.id !== id));
   }
 
-
   async function refreshAll() {
     await portfolio.refresh();
     setHistoryRefreshKey((value) => value + 1);
@@ -313,13 +319,7 @@ export default function WalletDashboard({
   }
 
   if (!ready || !walletsReady) {
-    return (
-      <main className="shell">
-        <section className="panel">
-          <p>Loading Krypto121…</p>
-        </section>
-      </main>
-    );
+    return <main className="shell"><section className="panel"><p>Loading Krypto121…</p></section></main>;
   }
 
   if (!authenticated) {
@@ -329,7 +329,6 @@ export default function WalletDashboard({
           <strong>Krypto121</strong>
           <ThemeToggle compact />
         </header>
-
         <section className="landingHero">
           <p className="eyebrow">Krypto121</p>
           <h1>Krypto121 is a smart payment-routing wallet.</h1>
@@ -343,12 +342,10 @@ export default function WalletDashboard({
               <strong>
                 {initialPaymentRequest.amount
                   ? `${initialPaymentRequest.amount} ${initialPaymentRequest.asset}`
-                  : "Amount to enter"}
+                  : `${initialPaymentRequest.asset} · amount to enter`}
               </strong>
               <small>To {shortAddress(initialPaymentRequest.recipient)}</small>
-              {initialPaymentRequest.memo ? (
-                <small>Reference: {initialPaymentRequest.memo}</small>
-              ) : null}
+              {initialPaymentRequest.memo ? <small>Reference: {initialPaymentRequest.memo}</small> : null}
             </div>
           ) : null}
 
@@ -380,14 +377,8 @@ export default function WalletDashboard({
 
       <main className="dashboardMain">
         <header className="mobileTopbar">
-          <button
-            className="hamburgerButton"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
-          >
-            <span />
-            <span />
-            <span />
+          <button className="hamburgerButton" onClick={() => setMenuOpen(true)} aria-label="Open menu">
+            <span /><span /><span />
           </button>
           <strong>Krypto121</strong>
           <ThemeToggle compact />
@@ -415,16 +406,14 @@ export default function WalletDashboard({
 
               <article className="dashboardCard">
                 <div className="cardHeaderCompact">
-                  <span className="cardLabel">Balance</span>
-                  <button className="textButton" onClick={() => void refreshAll()}>
-                    Refresh
-                  </button>
+                  <span className="cardLabel">Stablecoin balances</span>
+                  <button className="textButton" onClick={() => void refreshAll()}>Refresh</button>
                 </div>
                 <strong className="balanceCompact">
-                  {portfolio.loading ? "…" : formatBalance(String(ownedUsdtTotal))}
+                  {portfolio.loading ? "…" : balanceSummary}
                 </strong>
                 <span className="cardSubtle">
-                  {ACTIVE_USDT.symbol} · {ownedWalletAddresses.length} owned {ownedWalletAddresses.length === 1 ? "wallet" : "wallets"} · {ACTIVE_ENVIRONMENT_LABEL}
+                  {ownedWalletAddresses.length} owned {ownedWalletAddresses.length === 1 ? "wallet" : "wallets"} · {ACTIVE_ENVIRONMENT_LABEL}
                 </span>
               </article>
 
@@ -491,11 +480,8 @@ export default function WalletDashboard({
           {activeSection ? (
             <aside className="secondarySideCard">
               <div className="sideCardHeader">
-                <button className="textButton" onClick={() => setActiveSection(null)}>
-                  Close
-                </button>
+                <button className="textButton" onClick={() => setActiveSection(null)}>Close</button>
               </div>
-
 
               {activeSection === "beneficiaries" && walletProvider ? (
                 <BeneficiariesPanel
@@ -526,8 +512,8 @@ export default function WalletDashboard({
                       <strong>{ACTIVE_CELO_CHAIN.name}</strong>
                     </div>
                     <div>
-                      <span>Asset</span>
-                      <strong>{ACTIVE_USDT.displaySymbol}</strong>
+                      <span>Assets</span>
+                      <strong>{ACTIVE_STABLECOINS.map((asset) => asset.symbol).join(" · ")}</strong>
                     </div>
                     <div>
                       <span>Wallet provider</span>

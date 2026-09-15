@@ -1,45 +1,42 @@
-# Krypto121 v0.20 — Gas abstraction
+# Krypto121 v0.21 — Real multi-asset model
 
-This is an **overlay package** for the current v0.19 project. Copy its files over the existing project.
+Overlay for the current v0.20 project.
 
-## What changes
+## Production
 
-On Celo Mainnet, the Krypto121 embedded wallet can pay the network fee in USDT instead of requiring CELO.
-
-The normal payment flow remains:
+Krypto121 now supports two real stablecoins on Celo Mainnet:
 
 ```text
-Choose where to pay
-→ choose how much
-→ review recipient amount + fee + estimated total
-→ make payment
+USDT
+USDC
 ```
 
-No extra gas-token step is added.
+Both can be sent and received directly.
 
-## Important compatibility boundary
+The Krypto121 embedded wallet pays Celo network fees in the same selected stablecoin through Celo fee abstraction.
 
-Celo fee abstraction uses the Celo-specific CIP-64 transaction format. Krypto121 uses it for the Privy embedded wallet.
+## Why only Celo in this milestone?
 
-Linked external wallets keep their own fee behavior. Generic Ethereum wallets such as MetaMask may still require CELO because they use the Ethereum-compatible transaction format.
+This milestone expands the **asset model**, not the route provider surface.
 
-## Apply
+Keeping USDT and USDC on the already-live Celo network gives Krypto121 a real multi-asset model without introducing Base or another chain before the first Relay integration.
 
-No database migration.
+The next routing milestone can then use the same asset registry to model source and destination assets on different networks.
 
-No new environment variables.
+## No migration
 
-Keep production:
+No Supabase migration and no new environment variables.
+
+Production stays:
 
 ```text
 NEXT_PUBLIC_KRYPTO_NETWORK=mainnet
 ```
 
-Then run:
+Apply the overlay and run:
 
-```bash
+```powershell
+Remove-Item -Recurse -Force .next
 npm install
 npm run build
 ```
-
-See `docs/upgrades/UPGRADE-v0.20.md`.

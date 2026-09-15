@@ -1,8 +1,9 @@
 import { isAddress } from "viem";
+import { ACTIVE_PAYMENT_NETWORK } from "@/lib/celo";
 import {
-  ACTIVE_PAYMENT_NETWORK,
-  ACTIVE_USDT,
-} from "@/lib/celo";
+  requireActiveStablecoin,
+  type StablecoinSymbol,
+} from "@/lib/assets";
 import type {
   PaymentIntent,
   PaymentQuote,
@@ -21,19 +22,22 @@ export function createDirectCeloIntent(input: {
   sourceWallet: `0x${string}`;
   destination: string;
   amount: string;
+  assetSymbol: StablecoinSymbol;
   memo?: string;
 }): PaymentIntent {
   if (!isAddress(input.destination)) {
     throw new Error("Enter a valid Celo/EVM wallet address");
   }
 
+  const selected = requireActiveStablecoin(input.assetSymbol);
   const now = new Date().toISOString();
+
   const asset = {
     type: "crypto" as const,
-    symbol: ACTIVE_USDT.symbol,
+    symbol: selected.symbol,
     network: ACTIVE_PAYMENT_NETWORK,
-    contractAddress: ACTIVE_USDT.address,
-    decimals: ACTIVE_USDT.decimals,
+    contractAddress: selected.contractAddress,
+    decimals: selected.decimals,
   };
 
   return {

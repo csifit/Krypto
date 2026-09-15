@@ -3,7 +3,11 @@ import {
   erc20Abi,
   parseUnits,
 } from "viem";
-import { CELO_SEPOLIA_TEST_USDT, celoSepolia } from "@/lib/celo";
+import {
+  ACTIVE_CELO_CHAIN,
+  ACTIVE_PAYMENT_NETWORK,
+  ACTIVE_USDT,
+} from "@/lib/celo";
 import { getServerCeloPublicClient } from "@/lib/server/rpc";
 import type { LocalPaymentRecord } from "@/lib/payments/types";
 
@@ -17,7 +21,7 @@ function equalAddress(left: string, right: string) {
   return left.toLowerCase() === right.toLowerCase();
 }
 
-function assertDirectTestIntent(record: LocalPaymentRecord) {
+function assertDirectCeloIntent(record: LocalPaymentRecord) {
   const { intent, quote } = record;
 
   if (record.id !== intent.id) {
@@ -39,19 +43,17 @@ function assertDirectTestIntent(record: LocalPaymentRecord) {
     throw new Error("Unsupported settlement asset");
   }
 
-  const expected = CELO_SEPOLIA_TEST_USDT;
-
   if (
-    intent.sourceAsset.network !== "celo-sepolia" ||
-    intent.destinationAsset.network !== "celo-sepolia" ||
-    !equalAddress(intent.sourceAsset.contractAddress, expected.address) ||
-    !equalAddress(intent.destinationAsset.contractAddress, expected.address) ||
-    intent.sourceAsset.decimals !== expected.decimals ||
-    intent.destinationAsset.decimals !== expected.decimals ||
-    intent.sourceAsset.symbol !== expected.symbol ||
-    intent.destinationAsset.symbol !== expected.symbol
+    intent.sourceAsset.network !== ACTIVE_PAYMENT_NETWORK ||
+    intent.destinationAsset.network !== ACTIVE_PAYMENT_NETWORK ||
+    !equalAddress(intent.sourceAsset.contractAddress, ACTIVE_USDT.address) ||
+    !equalAddress(intent.destinationAsset.contractAddress, ACTIVE_USDT.address) ||
+    intent.sourceAsset.decimals !== ACTIVE_USDT.decimals ||
+    intent.destinationAsset.decimals !== ACTIVE_USDT.decimals ||
+    intent.sourceAsset.symbol !== ACTIVE_USDT.symbol ||
+    intent.destinationAsset.symbol !== ACTIVE_USDT.symbol
   ) {
-    throw new Error("Payment asset does not match the active settlement asset");
+    throw new Error("Payment asset does not match the active Krypto121 environment");
   }
 
   if (
@@ -65,7 +67,7 @@ function assertDirectTestIntent(record: LocalPaymentRecord) {
 export async function verifyDirectCeloSettlement(
   record: LocalPaymentRecord,
 ): Promise<VerifiedSettlement> {
-  assertDirectTestIntent(record);
+  assertDirectCeloIntent(record);
 
   const publicClient = getServerCeloPublicClient();
   const [transaction, receipt] = await Promise.all([
@@ -81,7 +83,7 @@ export async function verifyDirectCeloSettlement(
     throw new Error("Blockchain source wallet does not match the payment");
   }
 
-  if (!transaction.to || !equalAddress(transaction.to, CELO_SEPOLIA_TEST_USDT.address)) {
+  if (!transaction.to || !equalAddress(transaction.to, ACTIVE_USDT.address)) {
     throw new Error("Blockchain transaction used an unexpected token contract");
   }
 
@@ -106,7 +108,7 @@ export async function verifyDirectCeloSettlement(
   const [recipient, rawAmount] = decoded.args as readonly [`0x${string}`, bigint];
   const expectedAmount = parseUnits(
     record.intent.sourceAmount,
-    CELO_SEPOLIA_TEST_USDT.decimals,
+    ACTIVE_USDT.decimals,
   );
 
   if (!equalAddress(recipient, record.intent.destination)) {
@@ -120,7 +122,7 @@ export async function verifyDirectCeloSettlement(
   const block = await publicClient.getBlock({ blockNumber: receipt.blockNumber });
 
   return {
-    chainId: celoSepolia.id,
+    chainId: ACTIVE_CELO_CHAIN.id,
     blockNumber: receipt.blockNumber,
     settledAt: new Date(Number(block.timestamp) * 1000).toISOString(),
   };

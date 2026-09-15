@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMfaEnrollment, usePrivy, useWallets } from "@privy-io/react-auth";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
+  ACTIVE_CELO_CHAIN,
+  ACTIVE_USDT,
+  IS_MAINNET,
+} from "@/lib/celo";
+import {
   BackendRequestError,
   createAdminElevationChallenge,
   getAdminOverview,
@@ -340,7 +345,7 @@ export default function AdminDashboard() {
           <div>
             <a className="textLink" href="/">← Dashboard</a>
             <h1>Administration</h1>
-            <p>Emergency controls and operational visibility.</p>
+            <p>Emergency controls and operational visibility · {ACTIVE_CELO_CHAIN.name} · {ACTIVE_USDT.symbol}.</p>
           </div>
           <div className="adminTopbarActions">
             <ThemeToggle compact />
@@ -375,7 +380,7 @@ export default function AdminDashboard() {
           <div>
             <a className="textLink" href="/">← Dashboard</a>
             <h1>Administration</h1>
-            <p>Emergency controls and operational visibility.</p>
+            <p>Emergency controls and operational visibility · {ACTIVE_CELO_CHAIN.name} · {ACTIVE_USDT.symbol}.</p>
           </div>
           <div className="adminTopbarActions">
             <ThemeToggle compact />
@@ -413,7 +418,7 @@ export default function AdminDashboard() {
         <div>
           <a className="textLink" href="/">← Dashboard</a>
           <h1>Administration</h1>
-          <p>Emergency controls and operational visibility.</p>
+          <p>Emergency controls and operational visibility · {ACTIVE_CELO_CHAIN.name} · {ACTIVE_USDT.symbol}.</p>
         </div>
         <div className="adminTopbarActions">
           <ThemeToggle compact />
@@ -464,7 +469,7 @@ export default function AdminDashboard() {
               <label className="adminToggleCard">
                 <div>
                   <strong>Mainnet payment gate</strong>
-                  <span>Off by default. Turning this on alone does not enable mainnet code.</span>
+                  <span>{IS_MAINNET ? "Controls live mainnet payment execution." : "Stored safety gate; this deployment is running on testnet."}</span>
                 </div>
                 <input
                   type="checkbox"
@@ -496,7 +501,7 @@ export default function AdminDashboard() {
             <div className="adminSectionHeader">
               <div>
                 <p className="eyebrow">Infrastructure</p>
-                <h2>RPC health</h2>
+                <h2>RPC health · {ACTIVE_CELO_CHAIN.name}</h2>
               </div>
               <button className="textButton" onClick={() => void load()} disabled={loading}>
                 {loading ? "Checking…" : "Refresh"}

@@ -2,83 +2,86 @@
 
 **Krypto121 is a smart payment-routing wallet. Create a wallet or bring the wallets you already use. Manage them from one place.**
 
-## v0.17 — Operational safety controls
+## v0.19 — Real USDT on Celo Mainnet
 
-This milestone adds emergency controls that are reusable for production while keeping ordinary users unrestricted by default.
-
-### Included
-
-- server-side pre-authorization immediately before wallet signing;
-- global Krypto121 payment kill-switch;
-- explicit mainnet payment gate, OFF by default;
-- optional maximum transaction amount, with **no limit by default**;
-- `super_admin` role stored server-side;
-- manual Active / Suspended / Blocked account states;
-- immutable-by-application admin audit history;
-- `/admin` operational dashboard;
-- server-side Celo RPC health and optional failover foundation.
-
-Suspension or blocking cannot freeze an external wallet or move user funds. It only disables Krypto121 write/payment actions while preserving read-only visibility.
-
-## Upgrade
-
-Apply:
+v0.19 adds a real production payment environment while preserving Celo Sepolia as the permanent development/test environment.
 
 ```text
-supabase/migrations/202609150006_operational_safety_controls.sql
+NEXT_PUBLIC_KRYPTO_NETWORK=testnet
+  -> Celo Sepolia
+  -> USDTd development token
+  -> test payment requests
+  -> test settlement verification
+
+NEXT_PUBLIC_KRYPTO_NETWORK=mainnet
+  -> Celo Mainnet (chain ID 42220)
+  -> real Tether USDT
+  -> real balance reads
+  -> real payment requests
+  -> real direct USDT transfers
+  -> mainnet settlement verification
 ```
 
-Then:
+### Production USDT
 
-```bash
-npm install
-npm run build
+Celo Mainnet USDT:
+
+```text
+0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e
+decimals: 6
 ```
 
-Keep:
+### Safety boundaries retained
+
+- the authenticated Privy user must own/link the source wallet;
+- account must be active;
+- global payment execution must be enabled;
+- the Mainnet payment gate must be enabled for mainnet;
+- optional maximum transaction amount remains available but defaults to no limit;
+- wallet approval remains mandatory;
+- settled payments are verified against the blockchain before storage;
+- duplicate transaction recording is prevented;
+- Super Admin emergency controls remain MFA/elevated-session protected.
+
+### Payment requests
+
+New payment links use request format v2 and include both asset and network. This prevents a Celo Sepolia USDTd request from being mistaken for a Celo Mainnet USDT request.
+
+Old v1 requests remain accepted only in the testnet environment.
+
+### Payment history
+
+The API returns payment records for the active environment only. Historical Sepolia test payments remain in Supabase but are not mixed into the mainnet payment history.
+
+### RPC
+
+Server-side settlement verification uses the RPC settings for the active environment.
+
+Optional production variables:
+
+```text
+CELO_MAINNET_RPC_PRIMARY=https://forno.celo.org
+CELO_MAINNET_RPC_SECONDARY=
+```
+
+Forno is the fallback/default primary. Configure an independent professional secondary RPC before meaningful production volume.
+
+### Go-live
+
+There is no database migration in v0.19.
+
+For local development keep:
 
 ```text
 NEXT_PUBLIC_KRYPTO_NETWORK=testnet
 ```
 
-Optional server-only RPC settings:
+For Vercel Production set:
 
 ```text
-CELO_SEPOLIA_RPC_PRIMARY=https://forno.celo-sepolia.celo-testnet.org
-CELO_SEPOLIA_RPC_SECONDARY=
+NEXT_PUBLIC_KRYPTO_NETWORK=mainnet
 ```
 
-There is no default super-admin account. See `docs/upgrades/UPGRADE-v0.17.md` for the one-time bootstrap procedure.
+Then deploy and, after verifying the live dashboard says Mainnet / USDT, unlock `/admin` and turn **Mainnet payment gate** ON.
 
-
-## v0.18 — Privileged Admin Security
-
-Super Admin is an emergency control plane, so v0.18 adds a separate privileged-access step without changing ordinary user accounts.
-
-Admin controls now require:
-
-```text
-Privy login
-   ↓
-MFA enrolled
-   ↓
-wallet-signed Krypto121 admin challenge
-   ↓
-15-minute privileged session
-   ↓
-administrative controls
-```
-
-The elevated session is stored as an HttpOnly SameSite=Strict cookie. Only a SHA-256 hash of the session token is stored in Supabase.
-
-Migration:
-
-```text
-supabase/migrations/202609150007_privileged_admin_access.sql
-```
-
-Before testing, enable an MFA method in the Privy Dashboard.
-
-Expanded wallet and admin-user accordions also receive a subtle lighter-gray open state.
-
-See `docs/upgrades/UPGRADE-v0.18.md`.
+Gas abstraction is not included in v0.19. Until the next milestone, a sending wallet still needs enough native network funds for transaction fees.

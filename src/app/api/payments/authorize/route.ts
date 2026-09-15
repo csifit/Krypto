@@ -1,4 +1,5 @@
 import { isAddress, parseUnits } from "viem";
+import { ACTIVE_PAYMENT_NETWORK } from "@/lib/celo";
 import { AccessPolicyError, requireSensitiveAction } from "@/lib/server/access";
 import { getOperationalSettings } from "@/lib/server/operations";
 import { AuthError, getPrivyLinkedEvmAddresses, requirePrivyUser } from "@/lib/server/privy";
@@ -25,6 +26,12 @@ export async function POST(request: Request) {
     }
     if (body.network !== "celo-sepolia" && body.network !== "celo") {
       return Response.json({ error: "Unsupported payment network" }, { status: 400 });
+    }
+    if (body.network !== ACTIVE_PAYMENT_NETWORK) {
+      return Response.json(
+        { error: "Payment network does not match the active Krypto121 environment" },
+        { status: 400 },
+      );
     }
 
     let amountUnits: bigint;

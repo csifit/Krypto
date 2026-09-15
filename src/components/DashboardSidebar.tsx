@@ -1,6 +1,7 @@
 "use client";
 
 import ThemeToggle from "@/components/ThemeToggle";
+import { ACTIVE_ENVIRONMENT_LABEL } from "@/lib/celo";
 
 export type SecondarySection = "wallets" | "beneficiaries" | "history" | "developer" | null;
 
@@ -79,7 +80,7 @@ export default function DashboardSidebar({
           <ThemeToggle />
           <div className="sidebarAccount">
             <span>{email ?? "Signed in"}</span>
-            <small>Test environment</small>
+            <small>{ACTIVE_ENVIRONMENT_LABEL}</small>
           </div>
           <button className="sidebarSignOut" onClick={onLogout}>
             Sign out

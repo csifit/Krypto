@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
+import { ACTIVE_USDT } from "@/lib/celo";
 import {
   buildPaymentRequestLink,
   createPaymentRequest,
@@ -114,7 +115,7 @@ export default function ReceivePanel({
     await navigator.share({
       title: "Krypto121 payment request",
       text: amount.trim()
-        ? `Payment request for ${amount.trim()} USDTd`
+        ? `Payment request for ${amount.trim()} ${ACTIVE_USDT.symbol}`
         : "Krypto121 payment request",
       url: paymentLink,
     });
@@ -132,7 +133,7 @@ export default function ReceivePanel({
   return (
     <section className="receivePanel">
       <p className="eyebrow">Receive funds</p>
-      <h2>Receive USDTd</h2>
+      <h2>Receive {ACTIVE_USDT.symbol}</h2>
 
       {wallets.length > 1 ? (
         <label className="field">
@@ -186,7 +187,7 @@ export default function ReceivePanel({
               inputMode="decimal"
               placeholder="0.00"
             />
-            <strong>USDTd</strong>
+            <strong>{ACTIVE_USDT.symbol}</strong>
           </div>
         </label>
 
@@ -234,7 +235,7 @@ export default function ReceivePanel({
             </div>
 
             <div className="paymentRequestSummary">
-              <strong>{amount.trim() ? `${amount.trim()} USDTd` : "Amount chosen by payer"}</strong>
+              <strong>{amount.trim() ? `${amount.trim()} ${ACTIVE_USDT.symbol}` : "Amount chosen by payer"}</strong>
               <span>To {selected.label} · {shortAddress(selected.address)}</span>
               {memo.trim() ? <span>Reference: {memo.trim()}</span> : null}
             </div>

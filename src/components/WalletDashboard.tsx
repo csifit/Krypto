@@ -12,7 +12,15 @@ import SendPanel from "@/components/SendPanel";
 import TestFundsPanel from "@/components/TestFundsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useWalletPortfolio } from "@/hooks/useWalletPortfolio";
-import { celoSepolia } from "@/lib/celo";
+import {
+  ACTIVE_CELO_CHAIN,
+  ACTIVE_ENVIRONMENT_LABEL,
+  ACTIVE_PAYMENT_NETWORK,
+  ACTIVE_PRODUCT_LABEL,
+  ACTIVE_USDT,
+  IS_MAINNET,
+  getAddressExplorerUrl,
+} from "@/lib/celo";
 import {
   createBeneficiary,
   deleteBeneficiary,
@@ -134,7 +142,7 @@ export default function WalletDashboard({
 
   const walletProvider = useMemo(() => {
     if (!embeddedWallet?.address) return undefined;
-    return createPrivyWalletProvider(embeddedWallet, celoSepolia.id);
+    return createPrivyWalletProvider(embeddedWallet, ACTIVE_CELO_CHAIN.id);
   }, [embeddedWallet]);
 
   const paymentSources = useMemo<PaymentSourceWallet[]>(() => {
@@ -147,7 +155,7 @@ export default function WalletDashboard({
           walletLabels[embeddedWallet.address.toLowerCase()] ?? "Krypto121 wallet",
         provider: "Privy",
         embedded: true,
-        wallet: createPrivyWalletProvider(embeddedWallet, celoSepolia.id),
+        wallet: createPrivyWalletProvider(embeddedWallet, ACTIVE_CELO_CHAIN.id),
       });
     }
 
@@ -164,7 +172,7 @@ export default function WalletDashboard({
         label: walletLabels[linked.address.toLowerCase()] ?? linked.provider,
         provider: linked.provider,
         embedded: false,
-        wallet: createPrivyWalletProvider(connected, celoSepolia.id),
+        wallet: createPrivyWalletProvider(connected, ACTIVE_CELO_CHAIN.id),
       });
     }
 
@@ -334,7 +342,7 @@ export default function WalletDashboard({
               <span>Payment request</span>
               <strong>
                 {initialPaymentRequest.amount
-                  ? `${initialPaymentRequest.amount} USDTd`
+                  ? `${initialPaymentRequest.amount} ${initialPaymentRequest.asset}`
                   : "Amount to enter"}
               </strong>
               <small>To {shortAddress(initialPaymentRequest.recipient)}</small>
@@ -389,7 +397,7 @@ export default function WalletDashboard({
           <div className="dashboardPrimary">
             <header className="dashboardHeading">
               <div>
-                <p className="eyebrow">Krypto121 · Development</p>
+                <p className="eyebrow">Krypto121 · {ACTIVE_PRODUCT_LABEL}</p>
                 <h1 className="dashboardTitle">Overview</h1>
               </div>
             </header>
@@ -416,7 +424,7 @@ export default function WalletDashboard({
                   {portfolio.loading ? "…" : formatBalance(String(ownedUsdtTotal))}
                 </strong>
                 <span className="cardSubtle">
-                  USDTd · {ownedWalletAddresses.length} owned {ownedWalletAddresses.length === 1 ? "wallet" : "wallets"} · testnet
+                  {ACTIVE_USDT.symbol} · {ownedWalletAddresses.length} owned {ownedWalletAddresses.length === 1 ? "wallet" : "wallets"} · {ACTIVE_ENVIRONMENT_LABEL}
                 </span>
               </article>
 
@@ -505,15 +513,21 @@ export default function WalletDashboard({
 
               {activeSection === "developer" && walletProvider ? (
                 <div className="developerSideContent">
-                  <TestFundsPanel
-                    wallet={walletProvider}
-                    celoBalance={embeddedBalance?.celo ?? "0"}
-                    onFunded={refreshAll}
-                  />
+                  {!IS_MAINNET ? (
+                    <TestFundsPanel
+                      wallet={walletProvider}
+                      celoBalance={embeddedBalance?.celo ?? "0"}
+                      onFunded={refreshAll}
+                    />
+                  ) : null}
                   <div className="developerFacts">
                     <div>
                       <span>Network</span>
-                      <strong>Celo Sepolia</strong>
+                      <strong>{ACTIVE_CELO_CHAIN.name}</strong>
+                    </div>
+                    <div>
+                      <span>Asset</span>
+                      <strong>{ACTIVE_USDT.displaySymbol}</strong>
                     </div>
                     <div>
                       <span>Wallet provider</span>
@@ -527,7 +541,7 @@ export default function WalletDashboard({
                       <span>Wallet explorer</span>
                       <a
                         className="textLink"
-                        href={`https://celo-sepolia.blockscout.com/address/${walletProvider.address}`}
+                        href={getAddressExplorerUrl(ACTIVE_PAYMENT_NETWORK, walletProvider.address)}
                         target="_blank"
                         rel="noreferrer"
                       >

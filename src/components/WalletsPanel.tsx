@@ -2,6 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { isAddress } from "viem";
+import {
+  ACTIVE_CELO_CHAIN,
+  ACTIVE_ENVIRONMENT_LABEL,
+  ACTIVE_USDT,
+} from "@/lib/celo";
 import { looksLikeBitcoinMainnetAddress, watchAddressKey } from "@/lib/bitcoin/address";
 import type { BitcoinBalanceSnapshot } from "@/hooks/useBitcoinPortfolio";
 import type { WalletBalanceSnapshot } from "@/hooks/useWalletPortfolio";
@@ -364,7 +369,7 @@ export default function WalletsPanel({
             : snapshot?.error
               ? "Unavailable"
               : snapshot
-                ? `${formatBalance(snapshot.usdt)} USDTd`
+                ? `${formatBalance(snapshot.usdt)} ${ACTIVE_USDT.symbol}`
                 : "Loading…";
           const networkReady = snapshot ? Number(snapshot.celo) > 0 : false;
 
@@ -489,7 +494,7 @@ export default function WalletsPanel({
                   </div>
                   <div>
                     <span>Environment</span>
-                    <strong>{wallet.chainType === "bitcoin" ? "Mainnet" : "Test"}</strong>
+                    <strong>{wallet.chainType === "bitcoin" ? "Mainnet" : ACTIVE_ENVIRONMENT_LABEL}</strong>
                   </div>
                 </div>
 
@@ -550,7 +555,7 @@ export default function WalletsPanel({
                   <strong>
                     {wallet.chainType === "bitcoin"
                       ? "Bitcoin mainnet · Read only"
-                      : "Celo Sepolia · Test USDT"}
+                      : `${ACTIVE_CELO_CHAIN.name} · ${ACTIVE_USDT.displaySymbol}`}
                   </strong>
                 </div>
               </div>

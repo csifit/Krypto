@@ -1,4 +1,5 @@
 import { isAddress } from "viem";
+import { ACTIVE_PAYMENT_NETWORK } from "@/lib/celo";
 import type { LocalPaymentRecord } from "@/lib/payments/types";
 import { AuthError, getPrivyLinkedEvmAddresses, requirePrivyUser } from "@/lib/server/privy";
 import { ensureProfile } from "@/lib/server/profile";
@@ -52,6 +53,7 @@ export async function GET(request: Request) {
       .from("payments")
       .select("id, intent, quote, tx_hash, status, settled_at, beneficiary_name, verified_at, settlement_block_number, chain_id")
       .eq("privy_user_id", userId)
+      .eq("network", ACTIVE_PAYMENT_NETWORK)
       .order("settled_at", { ascending: false })
       .limit(100);
 

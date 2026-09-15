@@ -3,7 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { isAddress } from "viem";
-import { sendTestUsdt } from "@/lib/blockchain/usdt";
+import {
+  ACTIVE_CELO_CHAIN,
+  ACTIVE_PAYMENT_NETWORK,
+  ACTIVE_USDT,
+  IS_MAINNET,
+  getTransactionExplorerUrl,
+} from "@/lib/celo";
+import { sendUsdt } from "@/lib/blockchain/usdt";
 import { useUsdtBalance } from "@/hooks/useUsdtBalance";
 import { usePaymentReadiness } from "@/hooks/usePaymentReadiness";
 import {
@@ -202,11 +209,11 @@ export default function SendPanel({
         network:
           intent.sourceAsset.type === "crypto"
             ? intent.sourceAsset.network
-            : "celo-sepolia",
+            : ACTIVE_PAYMENT_NETWORK,
       });
 
       intent.status = "executing";
-      const txHash = await sendTestUsdt(
+      const txHash = await sendUsdt(
         executionSource.wallet,
         intent.destination,
         intent.sourceAmount,
@@ -239,7 +246,7 @@ export default function SendPanel({
     } catch (err) {
       intent.status = "failed";
       setStage("review");
-      setError(err instanceof Error ? err.message : "Could not send test USDT");
+      setError(err instanceof Error ? err.message : `Could not send ${ACTIVE_USDT.symbol}`);
     }
   }
 
@@ -266,10 +273,10 @@ export default function SendPanel({
     return (
       <section className="sendPanel">
         <span className="status">Settled</span>
-        <h2>Test payment sent</h2>
+        <h2>Payment sent</h2>
         <p>
-          {intent.sourceAmount} USDTd was confirmed through Krypto121&apos;s direct
-          test route. No real money was used.
+          {intent.sourceAmount} {ACTIVE_USDT.symbol} was confirmed through Krypto121&apos;s direct
+          route on {ACTIVE_CELO_CHAIN.name}.{!IS_MAINNET ? " No real money was used." : ""}
         </p>
         <p className="hint">
           From: {intentSource?.label ?? shortAddress(intent.sourceWallet)}
@@ -281,7 +288,7 @@ export default function SendPanel({
           <div className="technicalDetailsBody">
             <div>
               <span>Network</span>
-              <strong>Celo Sepolia</strong>
+              <strong>{ACTIVE_CELO_CHAIN.name}</strong>
             </div>
             <div>
               <span>Transaction ID</span>
@@ -289,7 +296,7 @@ export default function SendPanel({
             </div>
             <a
               className="inlineLink"
-              href={`https://celo-sepolia.blockscout.com/tx/${hash}`}
+              href={getTransactionExplorerUrl(ACTIVE_PAYMENT_NETWORK, hash)}
               target="_blank"
               rel="noreferrer"
             >
@@ -310,7 +317,7 @@ export default function SendPanel({
     return (
       <section className="sendPanel">
         <p className="eyebrow">Payment intent quoted</p>
-        <h2>{quote.destinationAmount} USDTd</h2>
+        <h2>{quote.destinationAmount} {ACTIVE_USDT.symbol}</h2>
 
         <div className="reviewRows">
           <div>
@@ -331,7 +338,7 @@ export default function SendPanel({
           </div>
           <div>
             <span>Krypto121 fee</span>
-            <strong>{quote.route.kryptoFeeAmount} USDTd</strong>
+            <strong>{quote.route.kryptoFeeAmount} {ACTIVE_USDT.symbol}</strong>
           </div>
           <div>
             <span>Network fee</span>
@@ -449,7 +456,7 @@ export default function SendPanel({
             inputMode="decimal"
             placeholder="0.00"
           />
-          <strong>USDTd</strong>
+          <strong>{ACTIVE_USDT.symbol}</strong>
         </div>
       </label>
 
@@ -488,13 +495,13 @@ export default function SendPanel({
 
         {readiness.network.state === "blocked" && readiness.route.state === "ready" ? (
           <p className="walletDirectoryNote">
-            This source wallet needs test network funds before it can send. Krypto121 keeps the underlying network token out of the normal payment flow.
+            This source wallet needs network fee funds before it can send. Krypto121 keeps the underlying network token out of the normal payment flow.
           </p>
         ) : null}
       </div>
 
       <p className="hint">
-        Available in selected wallet: {sourceBalance.loading ? "…" : sourceBalance.balance} USDTd
+        Available in selected wallet: {sourceBalance.loading ? "…" : sourceBalance.balance} {ACTIVE_USDT.symbol}
       </p>
       {sourceBalance.error ? <p className="errorText">{sourceBalance.error}</p> : null}
       {validationError ? <p className="errorText">{validationError}</p> : null}

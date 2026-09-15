@@ -1,11 +1,16 @@
 import { createPublicClient, fallback, http } from "viem";
-import { celoSepolia } from "@/lib/celo";
+import { ACTIVE_CELO_CHAIN, IS_MAINNET } from "@/lib/celo";
 
-const DEFAULT_PRIMARY_RPC = celoSepolia.rpcUrls.default.http[0];
+const DEFAULT_PRIMARY_RPC = ACTIVE_CELO_CHAIN.rpcUrls.default.http[0];
 
 function configuredRpcUrls() {
-  const primary = process.env.CELO_SEPOLIA_RPC_PRIMARY?.trim() || DEFAULT_PRIMARY_RPC;
-  const secondary = process.env.CELO_SEPOLIA_RPC_SECONDARY?.trim() || undefined;
+  const primary = IS_MAINNET
+    ? process.env.CELO_MAINNET_RPC_PRIMARY?.trim() || DEFAULT_PRIMARY_RPC
+    : process.env.CELO_SEPOLIA_RPC_PRIMARY?.trim() || DEFAULT_PRIMARY_RPC;
+
+  const secondary = IS_MAINNET
+    ? process.env.CELO_MAINNET_RPC_SECONDARY?.trim() || undefined
+    : process.env.CELO_SEPOLIA_RPC_SECONDARY?.trim() || undefined;
 
   return secondary && secondary !== primary ? [primary, secondary] : [primary];
 }
@@ -13,7 +18,7 @@ function configuredRpcUrls() {
 function createCeloServerClient() {
   const transports = configuredRpcUrls().map((url) => http(url));
   return createPublicClient({
-    chain: celoSepolia,
+    chain: ACTIVE_CELO_CHAIN,
     transport: transports.length === 1 ? transports[0] : fallback(transports),
   });
 }

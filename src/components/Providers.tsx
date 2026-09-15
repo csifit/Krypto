@@ -1,7 +1,7 @@
 "use client";
 
 import { PrivyProvider } from "@privy-io/react-auth";
-import { celoSepolia } from "@/lib/celo";
+import { ACTIVE_CELO_CHAIN } from "@/lib/celo";
 
 export default function Providers({
   children,
@@ -19,8 +19,8 @@ export default function Providers({
     <PrivyProvider
       appId={appId}
       config={{
-        defaultChain: celoSepolia,
-        supportedChains: [celoSepolia],
+        defaultChain: ACTIVE_CELO_CHAIN,
+        supportedChains: [ACTIVE_CELO_CHAIN],
         embeddedWallets: {
           ethereum: {
             createOnLogin: "users-without-wallets",

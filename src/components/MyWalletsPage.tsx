@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConnectWallet, useLinkAccount, usePrivy, useWallets } from "@privy-io/react-auth";
 import { isAddress } from "viem";
+import { ACTIVE_USDT } from "@/lib/celo";
 import DashboardSidebar, { type SecondarySection } from "@/components/DashboardSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import WalletsPanel from "@/components/WalletsPanel";
@@ -299,7 +300,7 @@ export default function MyWalletsPage() {
               </p>
             </div>
             <div className="walletPageSummary">
-              <strong>{portfolio.loading ? "…" : formatBalance(ownedTotal)} USDTd</strong>
+              <strong>{portfolio.loading ? "…" : formatBalance(ownedTotal)} {ACTIVE_USDT.symbol}</strong>
               <span>{ownedAddresses.length} owned {ownedAddresses.length === 1 ? "wallet" : "wallets"}</span>
               {bitcoinAddresses.length ? (
                 <span className="walletPageBitcoinSummary">

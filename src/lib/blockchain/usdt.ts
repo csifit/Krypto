@@ -9,12 +9,17 @@ import {
   parseUnits,
   type Hex,
 } from "viem";
-import { CELO_SEPOLIA_TEST_USDT, celoSepolia } from "@/lib/celo";
+import {
+  ACTIVE_CELO_CHAIN,
+  ACTIVE_USDT,
+  CELO_SEPOLIA_TEST_USDT,
+  IS_MAINNET,
+} from "@/lib/celo";
 import type { WalletProvider } from "@/lib/wallet/types";
 
 const publicClient = createPublicClient({
-  chain: celoSepolia,
-  transport: http(celoSepolia.rpcUrls.default.http[0]),
+  chain: ACTIVE_CELO_CHAIN,
+  transport: http(ACTIVE_CELO_CHAIN.rpcUrls.default.http[0]),
 });
 
 const mintAbi = [
@@ -32,7 +37,7 @@ const mintAbi = [
 
 export async function readUsdtBalance(address: `0x${string}`) {
   const rawBalance = await publicClient.readContract({
-    address: CELO_SEPOLIA_TEST_USDT.address,
+    address: ACTIVE_USDT.address,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: [address],
@@ -40,7 +45,7 @@ export async function readUsdtBalance(address: `0x${string}`) {
 
   return {
     raw: rawBalance,
-    formatted: formatUnits(rawBalance, CELO_SEPOLIA_TEST_USDT.decimals),
+    formatted: formatUnits(rawBalance, ACTIVE_USDT.decimals),
   };
 }
 
@@ -69,7 +74,7 @@ export async function checkDirectTransferPreflight(input: {
   let rawAmount: bigint;
 
   try {
-    rawAmount = parseUnits(input.amount, CELO_SEPOLIA_TEST_USDT.decimals);
+    rawAmount = parseUnits(input.amount, ACTIVE_USDT.decimals);
   } catch {
     return {
       routeAvailable: false,
@@ -89,7 +94,7 @@ export async function checkDirectTransferPreflight(input: {
   try {
     const [gas, gasPrice, nativeBalance] = await Promise.all([
       publicClient.estimateContractGas({
-        address: CELO_SEPOLIA_TEST_USDT.address,
+        address: ACTIVE_USDT.address,
         abi: erc20Abi,
         functionName: "transfer",
         args: [input.recipient, rawAmount],
@@ -122,7 +127,7 @@ async function sendContractTransaction(
   to: `0x${string}`,
   data: Hex,
 ) {
-  await wallet.switchChain(celoSepolia.id);
+  await wallet.switchChain(ACTIVE_CELO_CHAIN.id);
   const provider = await wallet.getEip1193Provider();
 
   const result = await provider.request({
@@ -145,7 +150,7 @@ async function sendContractTransaction(
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
   if (receipt.status !== "success") {
-    throw new Error("Transaction failed on Celo Sepolia");
+    throw new Error(`Transaction failed on ${ACTIVE_CELO_CHAIN.name}`);
   }
 
   return hash;
@@ -155,6 +160,10 @@ export async function mintTestUsdt(
   wallet: WalletProvider,
   amount = "100",
 ) {
+  if (IS_MAINNET) {
+    throw new Error("Test funding is unavailable on mainnet");
+  }
+
   const rawAmount = parseUnits(amount, CELO_SEPOLIA_TEST_USDT.decimals);
   const data = encodeFunctionData({
     abi: mintAbi,
@@ -162,10 +171,14 @@ export async function mintTestUsdt(
     args: [wallet.address, rawAmount],
   });
 
-  return sendContractTransaction(wallet, CELO_SEPOLIA_TEST_USDT.address, data);
+  return sendContractTransaction(
+    wallet,
+    CELO_SEPOLIA_TEST_USDT.address,
+    data,
+  );
 }
 
-export async function sendTestUsdt(
+export async function sendUsdt(
   wallet: WalletProvider,
   recipient: string,
   amount: string,
@@ -176,7 +189,7 @@ export async function sendTestUsdt(
 
   let rawAmount: bigint;
   try {
-    rawAmount = parseUnits(amount, CELO_SEPOLIA_TEST_USDT.decimals);
+    rawAmount = parseUnits(amount, ACTIVE_USDT.decimals);
   } catch {
     throw new Error("Enter a valid amount");
   }
@@ -187,7 +200,7 @@ export async function sendTestUsdt(
 
   const balance = await readUsdtBalance(wallet.address);
   if (rawAmount > balance.raw) {
-    throw new Error("Insufficient test USDT balance");
+    throw new Error(`Insufficient ${ACTIVE_USDT.symbol} balance`);
   }
 
   const data = encodeFunctionData({
@@ -196,5 +209,5 @@ export async function sendTestUsdt(
     args: [recipient as `0x${string}`, rawAmount],
   });
 
-  return sendContractTransaction(wallet, CELO_SEPOLIA_TEST_USDT.address, data);
+  return sendContractTransaction(wallet, ACTIVE_USDT.address, data);
 }

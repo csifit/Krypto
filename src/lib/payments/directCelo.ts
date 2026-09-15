@@ -1,5 +1,8 @@
 import { isAddress } from "viem";
-import { CELO_SEPOLIA_TEST_USDT } from "@/lib/celo";
+import {
+  ACTIVE_PAYMENT_NETWORK,
+  ACTIVE_USDT,
+} from "@/lib/celo";
 import type {
   PaymentIntent,
   PaymentQuote,
@@ -27,10 +30,10 @@ export function createDirectCeloIntent(input: {
   const now = new Date().toISOString();
   const asset = {
     type: "crypto" as const,
-    symbol: CELO_SEPOLIA_TEST_USDT.symbol,
-    network: "celo-sepolia" as const,
-    contractAddress: CELO_SEPOLIA_TEST_USDT.address,
-    decimals: CELO_SEPOLIA_TEST_USDT.decimals,
+    symbol: ACTIVE_USDT.symbol,
+    network: ACTIVE_PAYMENT_NETWORK,
+    contractAddress: ACTIVE_USDT.address,
+    decimals: ACTIVE_USDT.decimals,
   };
 
   return {

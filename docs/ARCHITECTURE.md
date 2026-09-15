@@ -270,19 +270,25 @@ Verify wallet ownership and blockchain settlement server-side before persisting 
 Emergency payment controls, account intervention, audit history, and RPC failover foundations. Complete.
 
 ### M17 — Privileged admin security
-Require MFA-backed, wallet-signed short-lived elevation before emergency administration controls. **Current.**
+Require MFA-backed, wallet-signed short-lived elevation before emergency administration controls. Complete.
 
-### M18 — Router expansion
-Add Relay only when there is a real supported asset/network route to execute.
+### M18 — Controlled Celo mainnet launch
+Run the existing direct route against real USDT on Celo Mainnet while retaining Sepolia as the development environment. **Current.**
 
 ### M19 — Gas UX
-Hide native-token complexity using the safest supported mechanism.
+Use Celo fee abstraction so a USDT user does not need to understand or separately acquire CELO when safely supported.
 
-### M20 — External settlement rails
+### M20 — Multi-asset model
+Introduce additional real assets/networks only where they serve a concrete payment route.
+
+### M21 — Router expansion
+Add Relay when there is a real supported asset/network route to execute and compare against direct settlement.
+
+### M22 — External settlement rails
 Off-ramp / FX / CBDC integrations through regulated providers.
 
-### M21 — Controlled mainnet launch
-Production RPC, monitoring, compliance boundaries, incident controls, and explicit mainnet activation.
+### M23 — Krypto121 Business
+Commercial controls, business workflows, billing and reporting around the payment-routing product.
 
 ## Principle
 
@@ -618,3 +624,53 @@ The privileged-session token itself is never stored in Supabase. Krypto121 store
 The admin session may be explicitly locked and expires automatically after 15 minutes.
 
 This does not give Krypto121 custody over user wallets, and it places no new default limits or restrictions on normal accounts.
+
+
+## v0.19 — Real USDT on Celo Mainnet
+
+Krypto121 now has one permanent environment selector rather than separate test-only and production code paths.
+
+```text
+NEXT_PUBLIC_KRYPTO_NETWORK
+   |
+   +-- testnet
+   |     +-- Celo Sepolia
+   |     +-- USDTd
+   |     +-- test explorer / RPC
+   |
+   +-- mainnet
+         +-- Celo Mainnet
+         +-- Tether USDT
+         +-- mainnet explorer / RPC
+```
+
+The selected environment drives:
+
+- Privy default/supported chain;
+- wallet balances;
+- direct-transfer preflight;
+- wallet chain switching;
+- token contract;
+- PaymentIntent asset/network;
+- payment-request asset/network;
+- transaction explorer links;
+- server-side RPC verification;
+- payment-history filtering.
+
+Mainnet uses:
+
+```text
+Celo chain ID: 42220
+USDT: 0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e
+decimals: 6
+```
+
+The existing operational controls remain authoritative. A mainnet build does not bypass the Mainnet payment gate, account status, source-wallet ownership check, optional maximum amount, or Super Admin emergency kill-switch.
+
+Payment requests move to v2 and carry explicit `network` and `asset` fields. A testnet payment link therefore cannot silently become a real-money mainnet request.
+
+The same Supabase project may contain historical test and production payment records. Payment-history reads are filtered to the active network so test settlements are not mixed into the mainnet user experience.
+
+Server-side RPC failover follows the active environment. Celo Sepolia and Celo Mainnet have separate optional primary/secondary environment variables.
+
+Gas abstraction is intentionally the next milestone. v0.19 still checks native network-fee readiness before allowing a direct USDT transfer.

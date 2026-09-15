@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
+import {
+  getCeloChainForPaymentNetwork,
+  getTransactionExplorerUrl,
+  type CeloPaymentNetwork,
+} from "@/lib/celo";
 import { listPayments } from "@/lib/backend/client";
 import type { LocalPaymentRecord } from "@/lib/payments/types";
 
@@ -56,7 +61,14 @@ export default function PaymentHistory({ refreshKey }: { refreshKey: number }) {
 
       {records.length ? (
         <div className="historyList">
-          {records.map((record) => (
+          {records.map((record) => {
+            const network =
+              record.intent.sourceAsset.type === "crypto"
+                ? (record.intent.sourceAsset.network as CeloPaymentNetwork)
+                : "celo-sepolia";
+            const chain = getCeloChainForPaymentNetwork(network);
+
+            return (
             <article className="historyRow" key={record.id}>
               <div>
                 <strong>
@@ -73,12 +85,12 @@ export default function PaymentHistory({ refreshKey }: { refreshKey: number }) {
                 <details className="historyTechnicalDetails">
                   <summary>Technical details</summary>
                   <div className="historyTechnicalBody">
-                    <span>Network: Celo Sepolia</span>
+                    <span>Network: {chain.name}</span>
                     {record.verification ? <span>Settlement: Verified on-chain</span> : null}
                     <span>Transaction: {shortAddress(record.txHash)}</span>
                     <a
                       className="inlineLink inlineLinkNoMargin"
-                      href={`https://celo-sepolia.blockscout.com/tx/${record.txHash}`}
+                      href={getTransactionExplorerUrl(network, record.txHash)}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -88,7 +100,8 @@ export default function PaymentHistory({ refreshKey }: { refreshKey: number }) {
                 </details>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </section>

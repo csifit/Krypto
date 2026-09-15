@@ -5,6 +5,7 @@ import { AuthError, getPrivyLinkedEvmAddresses, requirePrivyUser } from "@/lib/s
 import { ensureProfile } from "@/lib/server/profile";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { verifyPaymentSettlement } from "@/lib/server/settlement";
+import { reconcileTrackedPaymentRequest } from "@/lib/server/paymentRequests";
 
 export const runtime = "nodejs";
 
@@ -148,7 +149,12 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    return Response.json({ ok: true, verified: true });
+    const requestReconciled = await reconcileTrackedPaymentRequest(
+      record,
+      verified.settledAt,
+    );
+
+    return Response.json({ ok: true, verified: true, requestReconciled });
   } catch (error) {
     if (error instanceof AuthError) {
       return Response.json({ error: error.message }, { status: error.status });

@@ -1,5 +1,6 @@
 import WalletDashboard from "@/components/WalletDashboard";
 import { parsePaymentRequestParams } from "@/lib/payments/paymentRequest";
+import { getPublicTrackedPaymentRequest } from "@/lib/server/paymentRequests";
 
 function toSearchParams(
   values: Record<string, string | string[] | undefined>,
@@ -12,6 +13,27 @@ function toSearchParams(
   }
 
   return params;
+}
+
+function normalizedAmount(value: string) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return value;
+  return number.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function requestMatchesTracked(
+  parsed: NonNullable<ReturnType<typeof parsePaymentRequestParams>>,
+  tracked: NonNullable<Awaited<ReturnType<typeof getPublicTrackedPaymentRequest>>>,
+) {
+  return (
+    parsed.requestId === tracked.id &&
+    parsed.recipient.toLowerCase() === tracked.recipient.toLowerCase() &&
+    parsed.asset === tracked.asset &&
+    parsed.network === tracked.network &&
+    Boolean(parsed.amount) &&
+    normalizedAmount(parsed.amount!) === normalizedAmount(tracked.amount) &&
+    (parsed.memo ?? "") === (tracked.memo ?? "")
+  );
 }
 
 export default async function PayPage({
@@ -28,12 +50,50 @@ export default async function PayPage({
         <section className="panel setup">
           <span className="status">Invalid request</span>
           <h1 className="dashboardTitle">This payment request cannot be opened.</h1>
-          <p>
-            Ask the sender for a new Krypto121 QR code or payment link.
-          </p>
+          <p>Ask the sender for a new Krypto121 QR code or payment link.</p>
         </section>
       </main>
     );
+  }
+
+  if (request.requestId) {
+    const tracked = await getPublicTrackedPaymentRequest(request.requestId);
+
+    if (!tracked || !requestMatchesTracked(request, tracked)) {
+      return (
+        <main className="shell">
+          <section className="panel setup">
+            <span className="status">Invalid request</span>
+            <h1 className="dashboardTitle">This tracked payment request is not valid.</h1>
+            <p>Ask the sender for a new Krypto121 payment link.</p>
+          </section>
+        </main>
+      );
+    }
+
+    if (tracked.status === "paid") {
+      return (
+        <main className="shell">
+          <section className="panel setup">
+            <span className="status">Paid</span>
+            <h1 className="dashboardTitle">This payment request has already been paid.</h1>
+            <p>{tracked.amount} {tracked.asset}</p>
+          </section>
+        </main>
+      );
+    }
+
+    if (tracked.status === "cancelled") {
+      return (
+        <main className="shell">
+          <section className="panel setup">
+            <span className="status">Cancelled</span>
+            <h1 className="dashboardTitle">This payment request was cancelled.</h1>
+            <p>Ask the sender for a new Krypto121 payment link.</p>
+          </section>
+        </main>
+      );
+    }
   }
 
   const privyConfigured = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);

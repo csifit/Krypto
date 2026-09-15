@@ -100,6 +100,7 @@ export default function SendPanel({
   const [recipient, setRecipient] = useState(initialRequest?.recipient ?? "");
   const [amount, setAmount] = useState(initialRequest?.amount ?? "");
   const [memo, setMemo] = useState(initialRequest?.memo ?? "");
+  const [paymentRequestId, setPaymentRequestId] = useState<string | undefined>(initialRequest?.requestId);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [intent, setIntent] = useState<PaymentIntent | null>(null);
   const [quote, setQuote] = useState<PaymentQuote | null>(null);
@@ -118,6 +119,7 @@ export default function SendPanel({
     : (getActiveStablecoin(assetSymbol) ?? DEFAULT_STABLECOIN);
 
   const isRelayRoute = destination === "base";
+  const isTrackedRequest = Boolean(paymentRequestId);
   const payFeesInStablecoin = Boolean(
     IS_MAINNET &&
     selectedSource?.embedded &&
@@ -131,6 +133,7 @@ export default function SendPanel({
     setAssetSymbol(initialRequest.asset);
     setAmount(initialRequest.amount ?? "");
     setMemo(initialRequest.memo ?? "");
+    setPaymentRequestId(initialRequest.requestId);
     setError(null);
     setStage("form");
   }, [initialRequest]);
@@ -166,6 +169,7 @@ export default function SendPanel({
     setAssetSymbol(request.asset);
     setAmount(request.amount ?? "");
     setMemo(request.memo ?? "");
+    setPaymentRequestId(request.requestId);
     setScannerOpen(false);
     clearQuote();
   }
@@ -231,6 +235,7 @@ export default function SendPanel({
           amount,
           assetSymbol: selectedAsset.symbol,
           memo,
+          paymentRequestId,
         });
         nextIntent.status = "quoted";
 
@@ -393,6 +398,7 @@ export default function SendPanel({
     setAssetSymbol(DEFAULT_STABLECOIN.symbol);
     setAmount("");
     setMemo("");
+    setPaymentRequestId(undefined);
     setIntent(null);
     setQuote(null);
     setRelayExecutionQuote(null);
@@ -568,6 +574,7 @@ export default function SendPanel({
           <span>Pay to</span>
           <select
             value={destination}
+            disabled={isTrackedRequest}
             onChange={(event) => {
               const next = event.target.value as PaymentDestination;
               setDestination(next);
@@ -589,6 +596,7 @@ export default function SendPanel({
           <span>Asset</span>
           <select
             value={selectedAsset.symbol}
+            disabled={isTrackedRequest}
             onChange={(event) => {
               setAssetSymbol(event.target.value as StablecoinSymbol);
               setAmount("");
@@ -623,7 +631,7 @@ export default function SendPanel({
       <label className="field">
         <span className="fieldLabelWithAction">
           <span>Recipient wallet address</span>
-          {!isRelayRoute ? (
+          {!isRelayRoute && !isTrackedRequest ? (
             <button
               className="textButton"
               type="button"
@@ -638,6 +646,7 @@ export default function SendPanel({
         </span>
         <input
           value={recipient}
+          disabled={isTrackedRequest}
           onChange={(event) => setRecipient(event.target.value.trim())}
           placeholder="0x…"
           autoComplete="off"
@@ -653,6 +662,7 @@ export default function SendPanel({
         <div className="amountField">
           <input
             value={amount}
+            disabled={isTrackedRequest}
             onChange={(event) => {
               setAmount(event.target.value);
               setIntent(null);
@@ -670,11 +680,18 @@ export default function SendPanel({
         <span>Memo (optional)</span>
         <input
           value={memo}
+          disabled={isTrackedRequest}
           onChange={(event) => setMemo(event.target.value)}
           maxLength={120}
           placeholder="Invoice 1042"
         />
       </label>
+
+      {isTrackedRequest ? (
+        <p className="hint">
+          This is a tracked business request. Recipient, asset and amount are fixed by the request.
+        </p>
+      ) : null}
 
       {!isRelayRoute ? (
         <div className="paymentReadiness">

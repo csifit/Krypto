@@ -9,6 +9,7 @@ import {
   getActiveStablecoin,
   type StablecoinSymbol,
 } from "@/lib/assets";
+import { createBusinessPaymentRequest } from "@/lib/backend/client";
 import {
   buildPaymentRequestLink,
   createPaymentRequest,
@@ -27,8 +28,12 @@ function shortAddress(address: string) {
 
 export default function ReceivePanel({
   wallets,
+  getAccessToken,
+  onTrackedRequestCreated,
 }: {
   wallets: ReceiveWalletOption[];
+  getAccessToken(): Promise<string | null>;
+  onTrackedRequestCreated?(): void;
 }) {
   const [selectedId, setSelectedId] = useState(wallets[0]?.id ?? "");
   const [assetSymbol, setAssetSymbol] = useState<StablecoinSymbol>(
@@ -43,6 +48,7 @@ export default function ReceivePanel({
   const [creating, setCreating] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
+  const [tracked, setTracked] = useState(false);
 
   const selected = useMemo(
     () => wallets.find((wallet) => wallet.id === selectedId) ?? wallets[0],
@@ -67,6 +73,7 @@ export default function ReceivePanel({
     setQrDataUrl(null);
     setRequestError(null);
     setLinkCopied(false);
+    setTracked(false);
   }, [selectedId, assetSymbol]);
 
   async function copyAddress() {
@@ -84,12 +91,27 @@ export default function ReceivePanel({
     setLinkCopied(false);
 
     try {
+      const fixedAmount = amount.trim();
+      let requestId: string | undefined;
+
+      if (fixedAmount) {
+        const saved = await createBusinessPaymentRequest(getAccessToken, {
+          recipient: selected.address,
+          asset: selectedAsset.symbol,
+          amount: fixedAmount,
+          memo,
+        });
+        requestId = saved.id;
+      }
+
       const request = createPaymentRequest({
         recipient: selected.address,
         asset: selectedAsset.symbol,
-        amount,
+        amount: fixedAmount,
         memo,
+        requestId,
       });
+
       const link = buildPaymentRequestLink(window.location.origin, request);
       const qr = await QRCode.toDataURL(link, {
         width: 300,
@@ -99,9 +121,13 @@ export default function ReceivePanel({
 
       setPaymentLink(link);
       setQrDataUrl(qr);
+      setTracked(Boolean(requestId));
+
+      if (requestId) onTrackedRequestCreated?.();
     } catch (error) {
       setPaymentLink(null);
       setQrDataUrl(null);
+      setTracked(false);
       setRequestError(
         error instanceof Error ? error.message : "Could not create payment request",
       );
@@ -211,6 +237,7 @@ export default function ReceivePanel({
                 setAmount(event.target.value);
                 setPaymentLink(null);
                 setQrDataUrl(null);
+                setTracked(false);
               }}
               inputMode="decimal"
               placeholder="0.00"
@@ -227,6 +254,7 @@ export default function ReceivePanel({
               setMemo(event.target.value);
               setPaymentLink(null);
               setQrDataUrl(null);
+              setTracked(false);
             }}
             maxLength={120}
             placeholder="Invoice 1042"
@@ -234,7 +262,7 @@ export default function ReceivePanel({
         </label>
 
         <p className="hint">
-          The asset is included in the request. The payer cannot silently substitute a different stablecoin.
+          Add an amount for a tracked business request. Leave it empty for a reusable, untracked QR.
         </p>
 
         {requestError ? <p className="errorText">{requestError}</p> : null}
@@ -269,6 +297,7 @@ export default function ReceivePanel({
                   : `${selectedAsset.symbol} · amount chosen by payer`}
               </strong>
               <span>To {selected.label} · {shortAddress(selected.address)}</span>
+              {tracked ? <span>Tracked request · Pending</span> : <span>Reusable request</span>}
               {memo.trim() ? <span>Reference: {memo.trim()}</span> : null}
             </div>
 

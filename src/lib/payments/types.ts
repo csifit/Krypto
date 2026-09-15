@@ -31,6 +31,7 @@ export interface PaymentIntent {
   sourceAmount: string;
   destinationAmount?: string;
   memo?: string;
+  paymentRequestId?: string;
   status: "draft" | "quoted" | "approved" | "executing" | "settled" | "failed";
 }
 

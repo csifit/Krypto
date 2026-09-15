@@ -1,37 +1,27 @@
-# Krypto121 v0.22 — Relay
+# Krypto121 v0.23 — Business payment requests
 
-v0.22 adds Krypto121's first real alternative route:
+Overlay for v0.22.
 
-```text
-Celo USDC → Base USDC
-```
+## New capability
 
-Relay is selected automatically only when the payment intent requires the cross-network route.
-
-Normal users do not choose a provider.
-
-## UI refinement
-
-Stablecoin balances are now shown vertically:
+Fixed-amount Receive links are now persistent and tracked:
 
 ```text
-12.50 USDT
-8.00 USDC
+Pending → Paid
+        ↘ Cancelled
 ```
 
-instead of side by side.
+Settlement reconciliation is server-side and only marks the request Paid when the verified payment matches the stored request facts.
+
+Amount-less reusable QR codes remain untracked.
 
 ## Migration
 
-Apply:
+`supabase/migrations/202609150009_business_payment_requests.sql`
 
-`supabase/migrations/202609150008_relay_quotes.sql`
+## No new environment variables
 
-## Environment
-
-`RELAY_API_KEY` is optional. It is server-side only.
-
-Relay's default unauthenticated limits are sufficient for initial low-volume integration. Add an API key later when Krypto121 needs higher throughput.
+Your Relay and mainnet configuration stays unchanged.
 
 ## Build
 

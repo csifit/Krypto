@@ -4,6 +4,7 @@ import type {
 } from "@/lib/payments/types";
 import type { WalletLabel, WatchWallet } from "@/lib/wallet/directory";
 import type { KryptoRelayQuote, KryptoRelayStatus } from "@/lib/relay/types";
+import type { BusinessPaymentRequest } from "@/lib/payments/businessRequest";
 
 type AccessTokenGetter = () => Promise<string | null>;
 
@@ -135,6 +136,46 @@ export async function savePaymentRecord(
     method: "POST",
     body: JSON.stringify({ walletAddress: accountWalletAddress, record }),
   });
+}
+
+
+export async function listBusinessPaymentRequests(
+  getAccessToken: AccessTokenGetter,
+) {
+  return (await authedRequest<{ requests: BusinessPaymentRequest[] }>(
+    getAccessToken,
+    "/api/payment-requests",
+  )).requests;
+}
+
+export async function createBusinessPaymentRequest(
+  getAccessToken: AccessTokenGetter,
+  input: {
+    recipient: `0x${string}`;
+    asset: string;
+    amount: string;
+    memo?: string;
+  },
+) {
+  return (await authedRequest<{ request: BusinessPaymentRequest }>(
+    getAccessToken,
+    "/api/payment-requests",
+    { method: "POST", body: JSON.stringify(input) },
+  )).request;
+}
+
+export async function cancelBusinessPaymentRequest(
+  getAccessToken: AccessTokenGetter,
+  id: string,
+) {
+  return (await authedRequest<{ request: BusinessPaymentRequest }>(
+    getAccessToken,
+    "/api/payment-requests",
+    {
+      method: "PATCH",
+      body: JSON.stringify({ id, action: "cancel" }),
+    },
+  )).request;
 }
 
 export async function getRelayQuote(

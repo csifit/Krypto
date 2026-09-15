@@ -24,6 +24,7 @@ export function createDirectCeloIntent(input: {
   amount: string;
   assetSymbol: StablecoinSymbol;
   memo?: string;
+  paymentRequestId?: string;
 }): PaymentIntent {
   if (!isAddress(input.destination)) {
     throw new Error("Enter a valid Celo/EVM wallet address");
@@ -50,6 +51,7 @@ export function createDirectCeloIntent(input: {
     sourceAmount: input.amount,
     destinationAmount: input.amount,
     memo: input.memo?.trim() || undefined,
+    paymentRequestId: input.paymentRequestId,
     status: "draft",
   };
 }

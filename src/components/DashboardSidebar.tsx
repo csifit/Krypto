@@ -3,7 +3,13 @@
 import ThemeToggle from "@/components/ThemeToggle";
 import { ACTIVE_ENVIRONMENT_LABEL } from "@/lib/celo";
 
-export type SecondarySection = "wallets" | "beneficiaries" | "history" | "developer" | null;
+export type SecondarySection =
+  | "wallets"
+  | "beneficiaries"
+  | "requests"
+  | "history"
+  | "developer"
+  | null;
 
 export default function DashboardSidebar({
   open,
@@ -55,6 +61,12 @@ export default function DashboardSidebar({
               onClick={() => select("beneficiaries")}
             >
               Beneficiaries
+            </button>
+            <button
+              className={activeSection === "requests" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}
+              onClick={() => select("requests")}
+            >
+              Payment requests
             </button>
             <button
               className={activeSection === "history" ? "sidebarNavItem sidebarNavItemActive" : "sidebarNavItem"}

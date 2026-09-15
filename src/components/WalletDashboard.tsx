@@ -7,6 +7,7 @@ import { isAddress } from "viem";
 import BeneficiariesPanel from "@/components/BeneficiariesPanel";
 import DashboardSidebar, { type SecondarySection } from "@/components/DashboardSidebar";
 import PaymentHistory from "@/components/PaymentHistory";
+import PaymentRequestsPanel from "@/components/PaymentRequestsPanel";
 import ReceivePanel, { type ReceiveWalletOption } from "@/components/ReceivePanel";
 import SendPanel from "@/components/SendPanel";
 import TestFundsPanel from "@/components/TestFundsPanel";
@@ -80,6 +81,7 @@ export default function WalletDashboard({
   const [beneficiariesLoading, setBeneficiariesLoading] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [requestRefreshKey, setRequestRefreshKey] = useState(0);
   const [accountProfile, setAccountProfile] = useState<AccountProfileSummary | null>(null);
   const [copied, setCopied] = useState(false);
   const [initialSourceAddress, setInitialSourceAddress] = useState<`0x${string}` | undefined>();
@@ -95,7 +97,7 @@ export default function WalletDashboard({
       setShowReceive(false);
     }
 
-    if (requestedSection === "beneficiaries" || requestedSection === "history" || requestedSection === "developer") {
+    if (requestedSection === "beneficiaries" || requestedSection === "requests" || requestedSection === "history" || requestedSection === "developer") {
       setActiveSection(requestedSection);
     }
   }, []);
@@ -479,7 +481,11 @@ export default function WalletDashboard({
             ) : null}
 
             {showReceive && walletProvider ? (
-              <ReceivePanel wallets={receiveWallets} />
+              <ReceivePanel
+                wallets={receiveWallets}
+                getAccessToken={getAccessToken}
+                onTrackedRequestCreated={() => setRequestRefreshKey((value) => value + 1)}
+              />
             ) : null}
           </div>
 
@@ -495,6 +501,13 @@ export default function WalletDashboard({
                   loading={beneficiariesLoading}
                   onAdd={addBeneficiary}
                   onRemove={removeBeneficiary}
+                  readOnly={!accountProfile || accountProfile.accountStatus !== "active"}
+                />
+              ) : null}
+
+              {activeSection === "requests" && walletProvider ? (
+                <PaymentRequestsPanel
+                  refreshKey={requestRefreshKey}
                   readOnly={!accountProfile || accountProfile.accountStatus !== "active"}
                 />
               ) : null}

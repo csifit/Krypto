@@ -1705,3 +1705,359 @@ code {
   display: inline-block;
   margin-top: 16px;
 }
+
+/* v0.17 operational safety controls */
+.sidebarNavLink {
+  display: block;
+  text-decoration: none;
+  font: inherit;
+}
+
+.accountRestrictionNotice {
+  display: grid;
+  gap: 4px;
+  margin: 18px 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--soft);
+  padding: 14px 16px;
+}
+
+.accountRestrictionNotice strong {
+  font-size: 14px;
+}
+
+.accountRestrictionNotice span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.adminShell {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  padding: 32px;
+}
+
+.adminTopbar {
+  width: min(1180px, 100%);
+  margin: 0 auto 24px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.adminTopbar h1 {
+  margin: 10px 0 4px;
+  font-size: clamp(30px, 5vw, 46px);
+  letter-spacing: -0.04em;
+}
+
+.adminTopbar p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.adminTopbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.adminTopbarActions > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.adminContent {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+}
+
+.adminSection,
+.adminErrorCard {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 22px;
+}
+
+.adminErrorCard {
+  width: min(1180px, 100%);
+  margin: 0 auto 18px;
+}
+
+.adminSectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.adminSectionHeader h2 {
+  margin: 4px 0 0;
+  font-size: 22px;
+}
+
+.adminUpdated {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.adminControlGrid,
+.adminRpcGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.adminToggleCard,
+.adminLimitCard,
+.adminRpcCard {
+  min-height: 128px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--soft);
+  padding: 16px;
+}
+
+.adminToggleCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.adminToggleCard > div {
+  display: grid;
+  gap: 6px;
+}
+
+.adminToggleCard span,
+.adminLimitCard small,
+.adminRpcCard small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.adminToggleCard input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.adminLimitCard {
+  display: grid;
+  gap: 9px;
+}
+
+.adminLimitCard input,
+.adminUserEditor input,
+.adminUserEditor select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 0 12px;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.adminRpcCard {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+
+.adminRpcCard > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.adminRpcCard > strong {
+  font-size: 17px;
+}
+
+.adminUserList {
+  display: grid;
+  gap: 8px;
+}
+
+.adminUserRow {
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.adminUserRow > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 15px 16px;
+}
+
+.adminUserRow > summary::-webkit-details-marker {
+  display: none;
+}
+
+.adminUserIdentity {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.adminUserIdentity strong,
+.adminUserIdentity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adminUserIdentity span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.adminStatusBadge {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.adminStatus-active {
+  color: var(--foreground);
+}
+
+.adminStatus-suspended,
+.adminStatus-blocked {
+  background: var(--soft);
+  color: var(--foreground);
+}
+
+.adminUserDetails {
+  border-top: 1px solid var(--line);
+  padding: 16px;
+}
+
+.adminFactGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.adminFactGrid > div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.adminFactGrid span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.adminFactGrid strong {
+  font-size: 13px;
+}
+
+.adminUserEditor {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.7fr) minmax(240px, 1.3fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.adminUserEditor label {
+  display: grid;
+  gap: 7px;
+}
+
+.adminUserEditor label > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.adminUserEditor .errorText,
+.adminUserEditor .actions {
+  grid-column: 1 / -1;
+}
+
+.adminAuditList {
+  display: grid;
+}
+
+.adminAuditRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+}
+
+.adminAuditRow:first-child {
+  border-top: 0;
+}
+
+.adminAuditRow > div {
+  display: grid;
+  gap: 3px;
+}
+
+.adminAuditRow span,
+.adminAuditRow time {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 820px) {
+  .adminShell {
+    padding: 20px;
+  }
+
+  .adminTopbar,
+  .adminSectionHeader {
+    display: grid;
+  }
+
+  .adminTopbarActions {
+    justify-content: flex-start;
+  }
+
+  .adminControlGrid,
+  .adminRpcGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .adminFactGrid,
+  .adminUserEditor {
+    grid-template-columns: 1fr;
+  }
+
+  .adminAuditRow {
+    display: grid;
+  }
+}

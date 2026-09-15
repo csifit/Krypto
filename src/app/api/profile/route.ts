@@ -1,5 +1,5 @@
 import { isAddress } from "viem";
-import { AuthError, requirePrivyUser } from "@/lib/server/privy";
+import { AuthError, getPrivyUserEmail, requirePrivyUser } from "@/lib/server/privy";
 import { ensureProfile } from "@/lib/server/profile";
 
 export const runtime = "nodejs";
@@ -13,7 +13,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid wallet address" }, { status: 400 });
     }
 
-    const profile = await ensureProfile(userId, body.walletAddress);
+    const email = await getPrivyUserEmail(userId).catch(() => null);
+    const profile = await ensureProfile(userId, body.walletAddress, email);
     return Response.json({ profile });
   } catch (error) {
     if (error instanceof AuthError) {

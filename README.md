@@ -2,32 +2,30 @@
 
 **Krypto121 is a smart payment-routing wallet. Create a wallet or bring the wallets you already use. Manage them from one place.**
 
-## v0.16 — Mainnet-readiness foundations
+## v0.17 — Operational safety controls
 
-This milestone does **not** enable real-money transfers.
+This milestone adds emergency controls that are reusable for production while keeping ordinary users unrestricted by default.
 
-It strengthens the payment record boundary so a browser can no longer simply claim that a payment settled.
+### Included
 
-For the current direct test route, the server verifies the actual blockchain transaction before storing the durable payment record.
+- server-side pre-authorization immediately before wallet signing;
+- global Krypto121 payment kill-switch;
+- explicit mainnet payment gate, OFF by default;
+- optional maximum transaction amount, with **no limit by default**;
+- `super_admin` role stored server-side;
+- manual Active / Suspended / Blocked account states;
+- immutable-by-application admin audit history;
+- `/admin` operational dashboard;
+- server-side Celo RPC health and optional failover foundation.
 
-Checks include:
-
-- source wallet belongs to the authenticated Privy user;
-- transaction succeeded;
-- expected token contract;
-- expected sender;
-- expected recipient;
-- exact token amount;
-- matching intent / quote / route / asset.
-
-The server records the blockchain-derived settlement time, block number, chain ID and verification time.
+Suspension or blocking cannot freeze an external wallet or move user funds. It only disables Krypto121 write/payment actions while preserving read-only visibility.
 
 ## Upgrade
 
-Apply migration:
+Apply:
 
 ```text
-supabase/migrations/202609140005_payment_settlement_verification.sql
+supabase/migrations/202609150006_operational_safety_controls.sql
 ```
 
 Then:
@@ -43,6 +41,11 @@ Keep:
 NEXT_PUBLIC_KRYPTO_NETWORK=testnet
 ```
 
-No new environment variables are required.
+Optional server-only RPC settings:
 
-See `docs/upgrades/UPGRADE-v0.16.md`.
+```text
+CELO_SEPOLIA_RPC_PRIMARY=https://forno.celo-sepolia.celo-testnet.org
+CELO_SEPOLIA_RPC_SECONDARY=
+```
+
+There is no default super-admin account. See `docs/upgrades/UPGRADE-v0.17.md` for the one-time bootstrap procedure.

@@ -17,6 +17,7 @@ import {
   listWatchWallets,
   saveWalletLabel,
   syncProfile,
+  type AccountProfileSummary,
 } from "@/lib/backend/client";
 import type { LinkedWalletView, WalletLabel, WatchWallet } from "@/lib/wallet/directory";
 
@@ -51,6 +52,7 @@ export default function MyWalletsPage() {
   const [loading, setLoading] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [linkStatus, setLinkStatus] = useState<string | null>(null);
+  const [accountProfile, setAccountProfile] = useState<AccountProfileSummary | null>(null);
 
   const { linkWallet } = useLinkAccount({
     onSuccess: () => setLinkStatus("Wallet linked to your Krypto121 account."),
@@ -134,6 +136,7 @@ export default function MyWalletsPage() {
     if (!embeddedAddress) {
       setWatchWallets([]);
       setWalletLabels([]);
+      setAccountProfile(null);
       return;
     }
 
@@ -143,12 +146,13 @@ export default function MyWalletsPage() {
 
     void (async () => {
       try {
-        await syncProfile(getAccessToken, embeddedAddress);
+        const profileResult = await syncProfile(getAccessToken, embeddedAddress);
         const [nextWatchWallets, nextWalletLabels] = await Promise.all([
           listWatchWallets(getAccessToken),
           listWalletLabels(getAccessToken),
         ]);
         if (!cancelled) {
+          setAccountProfile(profileResult.profile);
           setWatchWallets(nextWatchWallets);
           setWalletLabels(nextWalletLabels);
         }
@@ -267,6 +271,7 @@ export default function MyWalletsPage() {
         onClose={() => setMenuOpen(false)}
         onSelect={handleSidebar}
         onLogout={logout}
+        isSuperAdmin={accountProfile?.role === "super_admin"}
       />
 
       <main className="dashboardMain">
@@ -306,6 +311,20 @@ export default function MyWalletsPage() {
 
           {backendError ? <p className="errorText">Backend: {backendError}</p> : null}
 
+          {accountProfile && accountProfile.accountStatus !== "active" ? (
+            <div className="accountRestrictionNotice" role="status">
+              <strong>
+                {accountProfile.accountStatus === "blocked"
+                  ? "Krypto121 actions are blocked"
+                  : "Krypto121 account changes are suspended"}
+              </strong>
+              <span>
+                {accountProfile.statusReason ??
+                  "Wallet-management changes and payments are temporarily unavailable."}
+              </span>
+            </div>
+          ) : null}
+
           <WalletsPanel
             embeddedAddress={embeddedAddress}
             linkedWallets={linkedWallets}
@@ -326,6 +345,7 @@ export default function MyWalletsPage() {
             onMakePayment={makePayment}
             onRenameWallet={renameWallet}
             onResetWalletName={resetWalletName}
+            readOnly={!accountProfile || accountProfile.accountStatus !== "active"}
           />
         </div>
       </main>

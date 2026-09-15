@@ -1,6 +1,7 @@
 import { isAddress } from "viem";
 import { looksLikeBitcoinMainnetAddress } from "@/lib/bitcoin/address";
 import { validateBitcoinAddress } from "@/lib/server/bitcoin";
+import { AccessPolicyError, requireSensitiveAction } from "@/lib/server/access";
 import { AuthError, requirePrivyUser } from "@/lib/server/privy";
 import { ensureProfile } from "@/lib/server/profile";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
 
     return Response.json({ watchWallets: (data ?? []).map(mapWatchWallet) });
   } catch (error) {
-    if (error instanceof AuthError) {
+    if (error instanceof AuthError || error instanceof AccessPolicyError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("watch wallets list failed", error);
@@ -50,6 +51,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { userId } = await requirePrivyUser(request);
+    await requireSensitiveAction(userId);
     await ensureProfile(userId);
 
     const body = (await request.json()) as {
@@ -114,7 +116,7 @@ export async function POST(request: Request) {
 
     return Response.json({ watchWallet: mapWatchWallet(data) }, { status: 201 });
   } catch (error) {
-    if (error instanceof AuthError) {
+    if (error instanceof AuthError || error instanceof AccessPolicyError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("watch wallet create failed", error);
@@ -125,6 +127,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { userId } = await requirePrivyUser(request);
+    await requireSensitiveAction(userId);
     const id = new URL(request.url).searchParams.get("id");
 
     if (!id) {
@@ -142,7 +145,7 @@ export async function DELETE(request: Request) {
 
     return Response.json({ ok: true });
   } catch (error) {
-    if (error instanceof AuthError) {
+    if (error instanceof AuthError || error instanceof AccessPolicyError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("watch wallet delete failed", error);

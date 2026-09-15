@@ -19,6 +19,7 @@ import {
   listBeneficiaries,
   listWalletLabels,
   syncProfile,
+  type AccountProfileSummary,
 } from "@/lib/backend/client";
 import type { Beneficiary } from "@/lib/payments/types";
 import type { PaymentRequest } from "@/lib/payments/paymentRequest";
@@ -71,6 +72,7 @@ export default function WalletDashboard({
   const [beneficiariesLoading, setBeneficiariesLoading] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [accountProfile, setAccountProfile] = useState<AccountProfileSummary | null>(null);
   const [copied, setCopied] = useState(false);
   const [initialSourceAddress, setInitialSourceAddress] = useState<`0x${string}` | undefined>();
 
@@ -225,6 +227,7 @@ export default function WalletDashboard({
     if (!walletAddress) {
       setBeneficiaries([]);
       setWalletLabels({});
+      setAccountProfile(null);
       return;
     }
 
@@ -235,7 +238,7 @@ export default function WalletDashboard({
       setBackendError(null);
 
       try {
-        await syncProfile(getAccessToken, address);
+        const profileResult = await syncProfile(getAccessToken, address);
 
         const [nextBeneficiaries, nextWalletLabels] = await Promise.all([
           listBeneficiaries(getAccessToken),
@@ -243,6 +246,7 @@ export default function WalletDashboard({
         ]);
 
         if (!cancelled) {
+          setAccountProfile(profileResult.profile);
           setBeneficiaries(nextBeneficiaries);
           const labelMap: Record<string, string> = {};
           for (const item of nextWalletLabels) {
@@ -363,6 +367,7 @@ export default function WalletDashboard({
         onClose={() => setMenuOpen(false)}
         onSelect={handleSidebar}
         onLogout={logout}
+        isSuperAdmin={accountProfile?.role === "super_admin"}
       />
 
       <main className="dashboardMain">
@@ -421,7 +426,7 @@ export default function WalletDashboard({
                 <div className="cardPrimaryActions">
                   <button
                     className="primaryButton"
-                    disabled={!walletProvider}
+                    disabled={!walletProvider || accountProfile?.accountStatus !== "active"}
                     onClick={() => {
                       setShowSend((value) => !value);
                       setShowReceive(false);
@@ -445,7 +450,21 @@ export default function WalletDashboard({
 
             {backendError ? <p className="errorText">Backend: {backendError}</p> : null}
 
-            {showSend && walletProvider ? (
+            {accountProfile && accountProfile.accountStatus !== "active" ? (
+              <div className="accountRestrictionNotice" role="status">
+                <strong>
+                  {accountProfile.accountStatus === "blocked"
+                    ? "Krypto121 actions are blocked"
+                    : "Krypto121 payments are suspended"}
+                </strong>
+                <span>
+                  {accountProfile.statusReason ??
+                    "Payment and account-changing actions are temporarily unavailable."}
+                </span>
+              </div>
+            ) : null}
+
+            {showSend && walletProvider && accountProfile?.accountStatus === "active" ? (
               <SendPanel
                 accountWalletAddress={walletProvider.address}
                 sourceWallets={paymentSources}
@@ -476,6 +495,7 @@ export default function WalletDashboard({
                   loading={beneficiariesLoading}
                   onAdd={addBeneficiary}
                   onRemove={removeBeneficiary}
+                  readOnly={!accountProfile || accountProfile.accountStatus !== "active"}
                 />
               ) : null}
 

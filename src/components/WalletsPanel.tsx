@@ -55,6 +55,7 @@ export default function WalletsPanel({
   onMakePayment,
   onRenameWallet,
   onResetWalletName,
+  readOnly = false,
 }: {
   embeddedAddress?: `0x${string}`;
   linkedWallets: LinkedWalletView[];
@@ -77,6 +78,7 @@ export default function WalletsPanel({
   onMakePayment(address: `0x${string}`): void;
   onRenameWallet(address: `0x${string}`, label: string): Promise<void>;
   onResetWalletName(address: `0x${string}`): Promise<void>;
+  readOnly?: boolean;
 }) {
   const [showWatchForm, setShowWatchForm] = useState(false);
   const [label, setLabel] = useState("");
@@ -268,11 +270,12 @@ export default function WalletsPanel({
     <section className="walletDirectory walletDirectoryPage">
       <div className="walletPageActions">
         <div className="walletDirectoryActions">
-          <button className="primaryButton" onClick={onLinkExternal}>
+          <button className="primaryButton" onClick={onLinkExternal} disabled={readOnly}>
             Link existing wallet
           </button>
           <button
             className="secondaryButton"
+            disabled={readOnly}
             onClick={() => {
               setShowWatchForm((value) => !value);
               setFormError(null);
@@ -402,7 +405,7 @@ export default function WalletsPanel({
                         <button
                           className="primaryButton"
                           type="button"
-                          disabled={renameSaving}
+                          disabled={renameSaving || readOnly}
                           onClick={() => void saveRename(wallet)}
                         >
                           {renameSaving ? "Saving…" : "Save"}
@@ -422,7 +425,7 @@ export default function WalletsPanel({
                           <button
                             className="textButton"
                             type="button"
-                            disabled={renameSaving}
+                            disabled={renameSaving || readOnly}
                             onClick={() => void resetRename(wallet)}
                           >
                             Use default name
@@ -494,13 +497,13 @@ export default function WalletsPanel({
                   <button
                     className="primaryButton"
                     onClick={() => onMakePayment(wallet.address as `0x${string}`)}
-                    disabled={!wallet.canPay}
+                    disabled={!wallet.canPay || readOnly}
                   >
                     Make payment from this wallet
                   </button>
 
                   {wallet.needsConnect ? (
-                    <button className="secondaryButton" onClick={onConnectExternal}>
+                    <button className="secondaryButton" onClick={onConnectExternal} disabled={readOnly}>
                       Connect wallet
                     </button>
                   ) : null}
@@ -515,6 +518,7 @@ export default function WalletsPanel({
                   {wallet.watchWalletId ? (
                     <button
                       className="textButton walletRemoveButton"
+                      disabled={readOnly}
                       onClick={() => void onRemoveWatch(wallet.watchWalletId!)}
                     >
                       Remove

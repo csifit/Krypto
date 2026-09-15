@@ -16,13 +16,24 @@ function getPrivyClient() {
   return privyClient;
 }
 
-type PrivyUserLike = {
-  linked_accounts?: Array<{ address?: string }>;
-  linkedAccounts?: Array<{ address?: string }>;
+type PrivyLinkedAccountLike = {
+  type?: string;
+  address?: string;
+  email?: string;
 };
 
+type PrivyUserLike = {
+  linked_accounts?: PrivyLinkedAccountLike[];
+  linkedAccounts?: PrivyLinkedAccountLike[];
+  email?: string | { address?: string };
+};
+
+async function getPrivyUser(userId: string) {
+  return (await getPrivyClient().users()._get(userId)) as unknown as PrivyUserLike;
+}
+
 export async function getPrivyLinkedEvmAddresses(userId: string) {
-  const user = (await getPrivyClient().users()._get(userId)) as unknown as PrivyUserLike;
+  const user = await getPrivyUser(userId);
   const accounts = user.linked_accounts ?? user.linkedAccounts ?? [];
 
   return new Set(
@@ -31,6 +42,33 @@ export async function getPrivyLinkedEvmAddresses(userId: string) {
       .filter((address): address is string => Boolean(address && isAddress(address)))
       .map((address) => address.toLowerCase()),
   );
+}
+
+export async function getPrivyUserEmail(userId: string) {
+  const user = await getPrivyUser(userId);
+
+  if (typeof user.email === "string" && user.email.includes("@")) {
+    return user.email;
+  }
+
+  if (
+    user.email &&
+    typeof user.email === "object" &&
+    typeof user.email.address === "string" &&
+    user.email.address.includes("@")
+  ) {
+    return user.email.address;
+  }
+
+  const accounts = user.linked_accounts ?? user.linkedAccounts ?? [];
+  const emailAccount = accounts.find(
+    (account) =>
+      account.type === "email" &&
+      typeof account.address === "string" &&
+      account.address.includes("@"),
+  );
+
+  return emailAccount?.address ?? null;
 }
 
 export async function requirePrivyUser(request: Request) {

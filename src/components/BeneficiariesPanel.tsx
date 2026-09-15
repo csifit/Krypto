@@ -9,11 +9,13 @@ export default function BeneficiariesPanel({
   loading,
   onAdd,
   onRemove,
+  readOnly = false,
 }: {
   beneficiaries: Beneficiary[];
   loading?: boolean;
   onAdd(name: string, address: `0x${string}`): Promise<void>;
   onRemove(id: string): Promise<void>;
+  readOnly?: boolean;
 }) {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
@@ -73,7 +75,7 @@ export default function BeneficiariesPanel({
               <button
                 className="textButton"
                 onClick={() => void remove(beneficiary.id)}
-                disabled={saving}
+                disabled={saving || readOnly}
               >
                 Remove
               </button>
@@ -91,6 +93,7 @@ export default function BeneficiariesPanel({
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Supplier ABC"
+            disabled={readOnly}
           />
         </label>
         <label className="field">
@@ -100,14 +103,18 @@ export default function BeneficiariesPanel({
             onChange={(event) => setAddress(event.target.value.trim())}
             placeholder="0x…"
             autoComplete="off"
+            disabled={readOnly}
           />
         </label>
       </div>
 
+      {readOnly ? (
+        <p className="walletDirectoryNote">Account-changing actions are temporarily unavailable.</p>
+      ) : null}
       {error ? <p className="errorText">{error}</p> : null}
 
       <div className="actions">
-        <button className="secondaryButton" onClick={() => void add()} disabled={saving}>
+        <button className="secondaryButton" onClick={() => void add()} disabled={saving || readOnly}>
           {saving ? "Saving…" : "Add beneficiary"}
         </button>
       </div>

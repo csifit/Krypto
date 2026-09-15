@@ -10,7 +10,7 @@ import {
   createDirectCeloIntent,
   quoteDirectCeloIntent,
 } from "@/lib/payments/directCelo";
-import { savePaymentRecord } from "@/lib/backend/client";
+import { authorizePayment, savePaymentRecord } from "@/lib/backend/client";
 import QrScanner from "@/components/QrScanner";
 import { parsePaymentRequestPayload, type PaymentRequest } from "@/lib/payments/paymentRequest";
 import type {
@@ -195,6 +195,16 @@ export default function SendPanel({
     setError(null);
 
     try {
+      await authorizePayment(getAccessToken, {
+        accountWalletAddress,
+        sourceWallet: executionSource.wallet.address,
+        amount: intent.sourceAmount,
+        network:
+          intent.sourceAsset.type === "crypto"
+            ? intent.sourceAsset.network
+            : "celo-sepolia",
+      });
+
       intent.status = "executing";
       const txHash = await sendTestUsdt(
         executionSource.wallet,

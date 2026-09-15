@@ -264,19 +264,22 @@ Let users give owned wallets simple private names that follow them into Send and
 Park Bitcoin addresses and monitor BTC balances without custody or signing. Complete.
 
 ### M15 — Mainnet-readiness foundations
-Verify wallet ownership and blockchain settlement server-side before persisting a payment. **Current.**
+Verify wallet ownership and blockchain settlement server-side before persisting a payment. Complete.
 
-### M16 — Router expansion
+### M16 — Operational safety controls
+Emergency payment controls, account intervention, audit history, and RPC failover foundations. **Current.**
+
+### M17 — Router expansion
 Add Relay only when there is a real supported asset/network route to execute.
 
-### M17 — Gas UX
+### M18 — Gas UX
 Hide native-token complexity using the safest supported mechanism.
 
-### M18 — External settlement rails
+### M19 — External settlement rails
 Off-ramp / FX / CBDC integrations through regulated providers.
 
-### M19 — Controlled mainnet launch
-Production RPC, monitoring, limits, compliance boundaries, incident controls, and explicit mainnet activation.
+### M20 — Controlled mainnet launch
+Production RPC, monitoring, compliance boundaries, incident controls, MFA enforcement for privileged access, and explicit mainnet activation.
 
 ## Principle
 
@@ -528,3 +531,54 @@ A second record cannot claim the same transaction on the same network because `n
 This verifier is intentionally route-aware. Today it supports only the existing `direct-celo` test route. Future Relay settlement must receive its own verifier rather than bypassing this boundary.
 
 Mainnet execution remains disabled. v0.16 improves the trust boundary; it does not turn on real-money transfers.
+
+
+## v0.17 — Operational safety controls
+
+Normal Krypto121 users remain unrestricted by default. Operational controls exist for exceptional intervention only.
+
+Default state:
+
+```text
+user account            active
+per-user restrictions   none
+Krypto121 payments      enabled
+maximum payment amount  no limit
+mainnet payment gate    disabled
+```
+
+The `super_admin` role is stored server-side in `profiles.role`. It is never assignable through registration or a normal account setting.
+
+A super admin may:
+
+- suspend, block, or reactivate ordinary Krypto121 accounts;
+- disable Krypto121 payment execution globally;
+- control the explicit mainnet payment gate;
+- optionally configure a maximum transaction amount;
+- view current RPC health;
+- review recent administrative audit events.
+
+A super admin cannot sign for a user, move user funds, access a seed phrase/private key, or freeze an external self-custodial wallet. Account intervention only controls Krypto121 actions. Suspended and blocked users retain read-only access to their information.
+
+Before a wallet authorization request is made, Krypto121 now performs a server-side execution-policy check:
+
+```text
+Payment review
+   ↓
+Krypto121 authorize endpoint
+   +-- account is active
+   +-- source wallet belongs to authenticated user
+   +-- global payment switch enabled
+   +-- mainnet gate enabled if the route is mainnet
+   +-- optional maximum amount not exceeded
+   ↓
+wallet approval
+```
+
+This adds no extra user step. The check occurs immediately before wallet authorization.
+
+Administrative changes are written to `admin_audit_log`. Ordinary user writes such as beneficiaries, watch-only wallets and wallet-name changes are also denied while an account is suspended or blocked.
+
+Critical server-side Celo reads now use a configurable RPC transport with optional failover. Celo Forno remains the default development primary, but it is a best-effort public endpoint; a professional secondary endpoint can be configured through `CELO_SEPOLIA_RPC_SECONDARY`. The administration page reports health for both endpoints.
+
+Mainnet transaction code remains disabled. The mainnet payment gate is an additional future safety control, not an activation mechanism by itself.

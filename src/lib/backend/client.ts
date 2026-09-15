@@ -5,6 +5,55 @@ import type {
 import type { WalletLabel, WatchWallet } from "@/lib/wallet/directory";
 
 type AccessTokenGetter = () => Promise<string | null>;
+export type AccountProfileSummary = {
+  id: string;
+  privyUserId: string;
+  walletAddress?: string;
+  email?: string;
+  role: "user" | "super_admin";
+  accountStatus: "active" | "suspended" | "blocked";
+  statusReason?: string;
+  statusChangedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminOverview = {
+  settings: {
+    paymentsEnabled: boolean;
+    mainnetPaymentsEnabled: boolean;
+    maxPaymentAmount?: string;
+    updatedAt: string;
+    updatedBy?: string;
+  };
+  rpcHealth: Array<{
+    role: "primary" | "secondary";
+    configured: boolean;
+    healthy: boolean;
+    latencyMs?: number;
+    blockNumber?: string;
+    error?: string;
+  }>;
+  users: Array<{
+    privyUserId: string;
+    email?: string;
+    walletAddress?: string;
+    role: "user" | "super_admin";
+    accountStatus: "active" | "suspended" | "blocked";
+    statusReason?: string;
+    statusChangedAt?: string;
+    createdAt: string;
+  }>;
+  audit: Array<{
+    id: string;
+    actorUserId: string;
+    action: string;
+    targetUserId?: string;
+    details: Record<string, unknown>;
+    createdAt: string;
+  }>;
+};
+
 
 async function authedRequest<T>(
   getAccessToken: AccessTokenGetter,
@@ -38,7 +87,7 @@ export async function syncProfile(
   getAccessToken: AccessTokenGetter,
   walletAddress: `0x${string}`,
 ) {
-  return authedRequest<{ profile: unknown }>(getAccessToken, "/api/profile", {
+  return authedRequest<{ profile: AccountProfileSummary }>(getAccessToken, "/api/profile", {
     method: "POST",
     body: JSON.stringify({ walletAddress }),
   });
@@ -181,3 +230,52 @@ export async function readBitcoinWatchBalance(
     `/api/bitcoin/balance?address=${encodeURIComponent(address)}`,
   );
 }
+
+export async function authorizePayment(
+  getAccessToken: AccessTokenGetter,
+  input: {
+    accountWalletAddress: `0x${string}`;
+    sourceWallet: `0x${string}`;
+    amount: string;
+    network: "celo-sepolia" | "celo";
+  },
+) {
+  return authedRequest<{ authorized: true }>(
+    getAccessToken,
+    "/api/payments/authorize",
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export async function getAdminOverview(getAccessToken: AccessTokenGetter) {
+  return authedRequest<AdminOverview>(getAccessToken, "/api/admin/overview");
+}
+
+export async function updateAdminSettings(
+  getAccessToken: AccessTokenGetter,
+  input: {
+    paymentsEnabled: boolean;
+    mainnetPaymentsEnabled: boolean;
+    maxPaymentAmount: string | null;
+  },
+) {
+  return authedRequest<{ ok: true }>(getAccessToken, "/api/admin/settings", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAdminUserStatus(
+  getAccessToken: AccessTokenGetter,
+  input: {
+    targetUserId: string;
+    status: "active" | "suspended" | "blocked";
+    reason?: string;
+  },
+) {
+  return authedRequest<{ ok: true }>(getAccessToken, "/api/admin/user-status", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+

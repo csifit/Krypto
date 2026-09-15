@@ -1,17 +1,11 @@
 import {
-  createPublicClient,
   decodeFunctionData,
   erc20Abi,
-  http,
   parseUnits,
 } from "viem";
 import { CELO_SEPOLIA_TEST_USDT, celoSepolia } from "@/lib/celo";
+import { getServerCeloPublicClient } from "@/lib/server/rpc";
 import type { LocalPaymentRecord } from "@/lib/payments/types";
-
-const publicClient = createPublicClient({
-  chain: celoSepolia,
-  transport: http(celoSepolia.rpcUrls.default.http[0]),
-});
 
 export type VerifiedSettlement = {
   chainId: number;
@@ -73,6 +67,7 @@ export async function verifyDirectCeloSettlement(
 ): Promise<VerifiedSettlement> {
   assertDirectTestIntent(record);
 
+  const publicClient = getServerCeloPublicClient();
   const [transaction, receipt] = await Promise.all([
     publicClient.getTransaction({ hash: record.txHash }),
     publicClient.getTransactionReceipt({ hash: record.txHash }),

@@ -1,4 +1,5 @@
 import { isAddress } from "viem";
+import { AccessPolicyError, requireSensitiveAction } from "@/lib/server/access";
 import { AuthError, requirePrivyUser } from "@/lib/server/privy";
 import { ensureProfile } from "@/lib/server/profile";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
     if (error) throw error;
     return Response.json({ beneficiaries: (data ?? []).map(mapBeneficiary) });
   } catch (error) {
-    if (error instanceof AuthError) {
+    if (error instanceof AuthError || error instanceof AccessPolicyError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("beneficiary list failed", error);
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { userId } = await requirePrivyUser(request);
+    await requireSensitiveAction(userId);
     const body = (await request.json()) as {
       name?: string;
       address?: string;
@@ -78,7 +80,7 @@ export async function POST(request: Request) {
 
     return Response.json({ beneficiary: mapBeneficiary(data) });
   } catch (error) {
-    if (error instanceof AuthError) {
+    if (error instanceof AuthError || error instanceof AccessPolicyError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("beneficiary create failed", error);
@@ -89,6 +91,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { userId } = await requirePrivyUser(request);
+    await requireSensitiveAction(userId);
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return Response.json({ error: "Missing beneficiary id" }, { status: 400 });
 
@@ -102,7 +105,7 @@ export async function DELETE(request: Request) {
     if (error) throw error;
     return Response.json({ ok: true });
   } catch (error) {
-    if (error instanceof AuthError) {
+    if (error instanceof AuthError || error instanceof AccessPolicyError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("beneficiary delete failed", error);

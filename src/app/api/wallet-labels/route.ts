@@ -1,4 +1,5 @@
 import { isAddress } from "viem";
+import { AccessPolicyError, requireSensitiveAction } from "@/lib/server/access";
 import { AuthError, requirePrivyUser } from "@/lib/server/privy";
 import { ensureProfile } from "@/lib/server/profile";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
 
     return Response.json({ walletLabels: (data ?? []).map(mapWalletLabel) });
   } catch (error) {
-    if (error instanceof AuthError) {
+    if (error instanceof AuthError || error instanceof AccessPolicyError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("wallet labels list failed", error);
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   try {
     const { userId } = await requirePrivyUser(request);
+    await requireSensitiveAction(userId);
     await ensureProfile(userId);
 
     const body = (await request.json()) as {
@@ -81,7 +83,7 @@ export async function PUT(request: Request) {
 
     return Response.json({ walletLabel: mapWalletLabel(data) });
   } catch (error) {
-    if (error instanceof AuthError) {
+    if (error instanceof AuthError || error instanceof AccessPolicyError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("wallet label save failed", error);
@@ -92,6 +94,7 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { userId } = await requirePrivyUser(request);
+    await requireSensitiveAction(userId);
     const address = new URL(request.url).searchParams.get("address")?.trim();
 
     if (!address || !isAddress(address)) {
@@ -109,7 +112,7 @@ export async function DELETE(request: Request) {
 
     return Response.json({ ok: true });
   } catch (error) {
-    if (error instanceof AuthError) {
+    if (error instanceof AuthError || error instanceof AccessPolicyError) {
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("wallet label delete failed", error);

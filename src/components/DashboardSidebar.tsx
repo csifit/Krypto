@@ -11,6 +11,7 @@ export default function DashboardSidebar({
   onClose,
   onSelect,
   onLogout,
+  isSuperAdmin = false,
 }: {
   open: boolean;
   activeSection: SecondarySection;
@@ -18,6 +19,7 @@ export default function DashboardSidebar({
   onClose(): void;
   onSelect(section: SecondarySection): void;
   onLogout(): void;
+  isSuperAdmin?: boolean;
 }) {
   function select(section: SecondarySection) {
     onSelect(section);
@@ -65,6 +67,11 @@ export default function DashboardSidebar({
             >
               Developer tools
             </button>
+            {isSuperAdmin ? (
+              <a className="sidebarNavItem sidebarNavLink" href="/admin">
+                Administration
+              </a>
+            ) : null}
           </nav>
         </div>
 

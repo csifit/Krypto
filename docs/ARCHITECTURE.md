@@ -267,19 +267,22 @@ Park Bitcoin addresses and monitor BTC balances without custody or signing. Comp
 Verify wallet ownership and blockchain settlement server-side before persisting a payment. Complete.
 
 ### M16 — Operational safety controls
-Emergency payment controls, account intervention, audit history, and RPC failover foundations. **Current.**
+Emergency payment controls, account intervention, audit history, and RPC failover foundations. Complete.
 
-### M17 — Router expansion
+### M17 — Privileged admin security
+Require MFA-backed, wallet-signed short-lived elevation before emergency administration controls. **Current.**
+
+### M18 — Router expansion
 Add Relay only when there is a real supported asset/network route to execute.
 
-### M18 — Gas UX
+### M19 — Gas UX
 Hide native-token complexity using the safest supported mechanism.
 
-### M19 — External settlement rails
+### M20 — External settlement rails
 Off-ramp / FX / CBDC integrations through regulated providers.
 
-### M20 — Controlled mainnet launch
-Production RPC, monitoring, compliance boundaries, incident controls, MFA enforcement for privileged access, and explicit mainnet activation.
+### M21 — Controlled mainnet launch
+Production RPC, monitoring, compliance boundaries, incident controls, and explicit mainnet activation.
 
 ## Principle
 
@@ -582,3 +585,36 @@ Administrative changes are written to `admin_audit_log`. Ordinary user writes su
 Critical server-side Celo reads now use a configurable RPC transport with optional failover. Celo Forno remains the default development primary, but it is a best-effort public endpoint; a professional secondary endpoint can be configured through `CELO_SEPOLIA_RPC_SECONDARY`. The administration page reports health for both endpoints.
 
 Mainnet transaction code remains disabled. The mainnet payment gate is an additional future safety control, not an activation mechanism by itself.
+
+
+## v0.18 — Privileged Admin Security
+
+Super Admin remains an exceptional emergency role, not part of normal user activity.
+
+A normal Privy-authenticated session is no longer sufficient to operate `/api/admin/*`.
+
+```text
+Super Admin login
+   ↓
+Privy MFA enrollment required
+   ↓
+Krypto121 issues 5-minute one-time challenge
+   ↓
+embedded wallet signs challenge
+   ↓
+Privy MFA verifies wallet use when required
+   ↓
+Krypto121 verifies signature server-side
+   ↓
+15-minute elevated admin session
+   ↓
+emergency controls available
+```
+
+The challenge message makes clear that it authorizes administrative access only and cannot transfer funds.
+
+The privileged-session token itself is never stored in Supabase. Krypto121 stores only its SHA-256 hash and sends the token to the browser in an HttpOnly, SameSite=Strict cookie scoped to `/api/admin`.
+
+The admin session may be explicitly locked and expires automatically after 15 minutes.
+
+This does not give Krypto121 custody over user wallets, and it places no new default limits or restrictions on normal accounts.

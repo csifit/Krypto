@@ -1,15 +1,15 @@
 import { parseUnits } from "viem";
-import { AccessPolicyError, requireSuperAdmin } from "@/lib/server/access";
+import { AccessPolicyError } from "@/lib/server/access";
+import { AdminElevationError, requireElevatedSuperAdmin } from "@/lib/server/adminElevation";
 import { getOperationalSettings, writeAdminAudit } from "@/lib/server/operations";
-import { AuthError, requirePrivyUser } from "@/lib/server/privy";
+import { AuthError } from "@/lib/server/privy";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 
 export const runtime = "nodejs";
 
 export async function PATCH(request: Request) {
   try {
-    const { userId } = await requirePrivyUser(request);
-    await requireSuperAdmin(userId);
+    const { userId } = await requireElevatedSuperAdmin(request);
 
     const body = (await request.json()) as {
       paymentsEnabled?: boolean;
@@ -79,8 +79,19 @@ export async function PATCH(request: Request) {
 
     return Response.json({ ok: true });
   } catch (error) {
-    if (error instanceof AuthError || error instanceof AccessPolicyError) {
-      return Response.json({ error: error.message }, { status: error.status });
+    if (
+      error instanceof AuthError ||
+      error instanceof AccessPolicyError ||
+      error instanceof AdminElevationError
+    ) {
+      return Response.json(
+        {
+          error: error.message,
+          code:
+            error instanceof AdminElevationError ? error.code : undefined,
+        },
+        { status: error.status },
+      );
     }
     console.error("admin settings update failed", error);
     return Response.json({ error: "Could not update operational settings" }, { status: 500 });

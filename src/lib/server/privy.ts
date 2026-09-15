@@ -22,10 +22,14 @@ type PrivyLinkedAccountLike = {
   email?: string;
 };
 
+type PrivyMfaMethodLike = string | { type?: string; method?: string };
+
 type PrivyUserLike = {
   linked_accounts?: PrivyLinkedAccountLike[];
   linkedAccounts?: PrivyLinkedAccountLike[];
   email?: string | { address?: string };
+  mfa_methods?: PrivyMfaMethodLike[];
+  mfaMethods?: PrivyMfaMethodLike[];
 };
 
 async function getPrivyUser(userId: string) {
@@ -42,6 +46,18 @@ export async function getPrivyLinkedEvmAddresses(userId: string) {
       .filter((address): address is string => Boolean(address && isAddress(address)))
       .map((address) => address.toLowerCase()),
   );
+}
+
+export async function getPrivyUserMfaMethods(userId: string) {
+  const user = await getPrivyUser(userId);
+  const methods = user.mfa_methods ?? user.mfaMethods ?? [];
+
+  return methods
+    .map((method) => {
+      if (typeof method === "string") return method;
+      return method.type ?? method.method ?? null;
+    })
+    .filter((method): method is string => Boolean(method));
 }
 
 export async function getPrivyUserEmail(userId: string) {

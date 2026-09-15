@@ -7,6 +7,7 @@
   --accent: #111827;
   --accent-contrast: #ffffff;
   --soft: #eef1f4;
+  --accordion-open: #f7f8fa;
   --sidebar: #ffffff;
   --shadow: 0 18px 55px rgba(17, 24, 39, 0.08);
 }
@@ -20,6 +21,7 @@
   --accent: #f3f4f6;
   --accent-contrast: #111318;
   --soft: #22262e;
+  --accordion-open: #1d2128;
   --sidebar: #13161b;
   --shadow: 0 18px 55px rgba(0, 0, 0, 0.28);
 }
@@ -1408,6 +1410,12 @@ code {
 
 .walletAccordion {
   border-bottom: 1px solid var(--line);
+  transition: background-color 150ms ease;
+}
+
+.walletAccordion[open],
+.adminUserRow[open] {
+  background: var(--accordion-open);
 }
 
 .walletAccordionSummary {
@@ -1895,6 +1903,7 @@ code {
   border-radius: 13px;
   background: var(--surface);
   overflow: hidden;
+  transition: background-color 150ms ease;
 }
 
 .adminUserRow > summary {
@@ -2059,5 +2068,63 @@ code {
 
   .adminAuditRow {
     display: grid;
+  }
+}
+
+
+/* v0.18 privileged admin security */
+.adminSecurityGate {
+  width: min(680px, calc(100% - 32px));
+  margin: 42px auto 0;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 26px;
+  box-shadow: var(--shadow);
+}
+
+.adminSecurityGate h2 {
+  margin: 8px 0 10px;
+  font-size: 24px;
+}
+
+.adminSecurityGate p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.adminSecurityGate small {
+  display: block;
+  margin-top: 16px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.adminSecurityActive {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 14px 16px;
+}
+
+.adminSecurityActive > div {
+  display: grid;
+  gap: 3px;
+}
+
+.adminSecurityActive span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 620px) {
+  .adminSecurityActive {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

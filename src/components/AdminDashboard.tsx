@@ -1,12 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useMfaEnrollment, usePrivy, useWallets } from "@privy-io/react-auth";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
+  BackendRequestError,
+  createAdminElevationChallenge,
   getAdminOverview,
+  lockAdminElevation,
   updateAdminSettings,
   updateAdminUserStatus,
+  verifyAdminElevation,
   type AdminOverview,
 } from "@/lib/backend/client";
 
@@ -141,8 +145,12 @@ function UserControl({
 
 export default function AdminDashboard() {
   const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
+  const { wallets, ready: walletsReady } = useWallets();
+  const { showMfaEnrollmentModal } = useMfaEnrollment();
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [loading, setLoading] = useState(false);
+  const [securityLocked, setSecurityLocked] = useState(true);
+  const [verifyingAccess, setVerifyingAccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
@@ -150,32 +158,124 @@ export default function AdminDashboard() {
   const [mainnetPaymentsEnabled, setMainnetPaymentsEnabled] = useState(false);
   const [maxPaymentAmount, setMaxPaymentAmount] = useState("");
 
+  const mfaEnrolled = Boolean(user?.mfaMethods?.length);
+
   const load = useCallback(async () => {
+    if (!mfaEnrolled) {
+      setOverview(null);
+      setSecurityLocked(true);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       const next = await getAdminOverview(getAccessToken);
       setOverview(next);
+      setSecurityLocked(false);
       setPaymentsEnabled(next.settings.paymentsEnabled);
       setMainnetPaymentsEnabled(next.settings.mainnetPaymentsEnabled);
       setMaxPaymentAmount(next.settings.maxPaymentAmount ?? "");
     } catch (loadError) {
       setOverview(null);
-      setError(loadError instanceof Error ? loadError.message : "Could not load administration");
+      if (loadError instanceof BackendRequestError && loadError.status === 428) {
+        setSecurityLocked(true);
+      } else {
+        setError(
+          loadError instanceof Error ? loadError.message : "Could not load administration",
+        );
+      }
     } finally {
       setLoading(false);
     }
-  }, [getAccessToken]);
+  }, [getAccessToken, mfaEnrolled]);
 
   useEffect(() => {
-    if (!ready || !authenticated) return;
+    if (!ready || !walletsReady || !authenticated) return;
     void load();
-  }, [ready, authenticated, load]);
+  }, [ready, walletsReady, authenticated, load]);
 
   const activeUsers = useMemo(
     () => overview?.users.filter((item) => item.accountStatus === "active").length ?? 0,
     [overview?.users],
   );
+
+  async function unlockPrivilegedAccess() {
+    setVerifyingAccess(true);
+    setError(null);
+
+    try {
+      const challenge = await createAdminElevationChallenge(getAccessToken);
+      const wallet = wallets.find(
+        (candidate) =>
+          candidate.walletClientType === "privy" &&
+          candidate.address.toLowerCase() === challenge.walletAddress.toLowerCase(),
+      );
+
+      if (!wallet) {
+        throw new Error(
+          "Your Krypto121 embedded wallet is not connected. Refresh the page and try again.",
+        );
+      }
+
+      const provider = (await wallet.getEthereumProvider()) as {
+        request(args: {
+          method: string;
+          params?: readonly unknown[];
+        }): Promise<unknown>;
+      };
+
+      const signature = await provider.request({
+        method: "personal_sign",
+        params: [challenge.message, wallet.address],
+      });
+
+      if (typeof signature !== "string" || !signature.startsWith("0x")) {
+        throw new Error("Wallet verification did not return a valid signature.");
+      }
+
+      await verifyAdminElevation(getAccessToken, {
+        challengeId: challenge.challengeId,
+        signature,
+      });
+
+      setSecurityLocked(false);
+      await load();
+    } catch (verifyError) {
+      setSecurityLocked(true);
+      setError(
+        verifyError instanceof Error
+          ? verifyError.message
+          : "Could not verify privileged access",
+      );
+    } finally {
+      setVerifyingAccess(false);
+    }
+  }
+
+  async function lockPrivilegedAccess() {
+    setError(null);
+    try {
+      await lockAdminElevation(getAccessToken);
+    } catch (lockError) {
+      setError(
+        lockError instanceof Error ? lockError.message : "Could not lock admin controls",
+      );
+      return;
+    }
+
+    setOverview(null);
+    setSecurityLocked(true);
+  }
+
+  async function handleLogout() {
+    try {
+      await lockAdminElevation(getAccessToken);
+    } catch {
+      // The privileged session may already be expired or absent.
+    }
+    logout();
+  }
 
   async function saveSettings() {
     setSavingSettings(true);
@@ -212,7 +312,7 @@ export default function AdminDashboard() {
     }
   }
 
-  if (!ready) {
+  if (!ready || !walletsReady) {
     return <main className="shell"><section className="panel"><p>Loading Krypto121…</p></section></main>;
   }
 
@@ -233,6 +333,80 @@ export default function AdminDashboard() {
     );
   }
 
+  if (!mfaEnrolled) {
+    return (
+      <main className="adminShell">
+        <header className="adminTopbar">
+          <div>
+            <a className="textLink" href="/">← Dashboard</a>
+            <h1>Administration</h1>
+            <p>Emergency controls and operational visibility.</p>
+          </div>
+          <div className="adminTopbarActions">
+            <ThemeToggle compact />
+            <span>{user?.email?.address ?? "Super admin"}</span>
+            <button className="secondaryButton" onClick={logout}>Sign out</button>
+          </div>
+        </header>
+
+        <section className="adminSecurityGate">
+          <p className="eyebrow">Privileged security</p>
+          <h2>Set up MFA before using admin controls.</h2>
+          <p>
+            Super-admin actions require an enrolled Privy MFA method. This protects the emergency controls without changing normal user accounts.
+          </p>
+          <div className="actions">
+            <button className="primaryButton" onClick={showMfaEnrollmentModal}>
+              Set up MFA
+            </button>
+          </div>
+          <small>
+            Enable at least one MFA method for this Privy app first. TOTP or passkey is recommended for the Super Admin account.
+          </small>
+        </section>
+      </main>
+    );
+  }
+
+  if (securityLocked && !overview) {
+    return (
+      <main className="adminShell">
+        <header className="adminTopbar">
+          <div>
+            <a className="textLink" href="/">← Dashboard</a>
+            <h1>Administration</h1>
+            <p>Emergency controls and operational visibility.</p>
+          </div>
+          <div className="adminTopbarActions">
+            <ThemeToggle compact />
+            <span>{user?.email?.address ?? "Super admin"}</span>
+            <button className="secondaryButton" onClick={() => void handleLogout()}>Sign out</button>
+          </div>
+        </header>
+
+        {error ? <div className="adminErrorCard"><strong>{error}</strong></div> : null}
+
+        <section className="adminSecurityGate">
+          <p className="eyebrow">Privileged security</p>
+          <h2>Verify before opening admin controls.</h2>
+          <p>
+            Krypto121 will ask your embedded wallet to sign a short-lived admin challenge. If your MFA verification is not already active, Privy will request it automatically.
+          </p>
+          <div className="actions">
+            <button
+              className="primaryButton"
+              onClick={() => void unlockPrivilegedAccess()}
+              disabled={verifyingAccess}
+            >
+              {verifyingAccess ? "Verifying…" : "Verify privileged access"}
+            </button>
+          </div>
+          <small>Privileged access expires automatically after 15 minutes.</small>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="adminShell">
       <header className="adminTopbar">
@@ -244,9 +418,21 @@ export default function AdminDashboard() {
         <div className="adminTopbarActions">
           <ThemeToggle compact />
           <span>{user?.email?.address ?? "Super admin"}</span>
-          <button className="secondaryButton" onClick={logout}>Sign out</button>
+          <button className="secondaryButton" onClick={() => void handleLogout()}>Sign out</button>
         </div>
       </header>
+
+      {overview ? (
+        <div className="adminSecurityActive">
+          <div>
+            <strong>Privileged access verified</strong>
+            <span>Unlocked until {formatDate(overview.security.elevatedUntil)}</span>
+          </div>
+          <button className="secondaryButton" onClick={() => void lockPrivilegedAccess()}>
+            Lock admin controls
+          </button>
+        </div>
+      ) : null}
 
       {error ? <div className="adminErrorCard"><strong>{error}</strong></div> : null}
       {loading && !overview ? <section className="panel"><p>Loading operational controls…</p></section> : null}

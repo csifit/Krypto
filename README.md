@@ -49,3 +49,36 @@ CELO_SEPOLIA_RPC_SECONDARY=
 ```
 
 There is no default super-admin account. See `docs/upgrades/UPGRADE-v0.17.md` for the one-time bootstrap procedure.
+
+
+## v0.18 — Privileged Admin Security
+
+Super Admin is an emergency control plane, so v0.18 adds a separate privileged-access step without changing ordinary user accounts.
+
+Admin controls now require:
+
+```text
+Privy login
+   ↓
+MFA enrolled
+   ↓
+wallet-signed Krypto121 admin challenge
+   ↓
+15-minute privileged session
+   ↓
+administrative controls
+```
+
+The elevated session is stored as an HttpOnly SameSite=Strict cookie. Only a SHA-256 hash of the session token is stored in Supabase.
+
+Migration:
+
+```text
+supabase/migrations/202609150007_privileged_admin_access.sql
+```
+
+Before testing, enable an MFA method in the Privy Dashboard.
+
+Expanded wallet and admin-user accordions also receive a subtle lighter-gray open state.
+
+See `docs/upgrades/UPGRADE-v0.18.md`.

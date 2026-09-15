@@ -5,6 +5,17 @@ import type {
 import type { WalletLabel, WatchWallet } from "@/lib/wallet/directory";
 
 type AccessTokenGetter = () => Promise<string | null>;
+
+export class BackendRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+  ) {
+    super(message);
+    this.name = "BackendRequestError";
+  }
+}
 export type AccountProfileSummary = {
   id: string;
   privyUserId: string;
@@ -19,6 +30,9 @@ export type AccountProfileSummary = {
 };
 
 export type AdminOverview = {
+  security: {
+    elevatedUntil: string;
+  };
   settings: {
     paymentsEnabled: boolean;
     mainnetPaymentsEnabled: boolean;
@@ -74,10 +88,15 @@ async function authedRequest<T>(
 
   const body = (await response.json().catch(() => ({}))) as {
     error?: string;
+    code?: string;
   } & T;
 
   if (!response.ok) {
-    throw new Error(body.error || "Krypto121 backend request failed");
+    throw new BackendRequestError(
+      body.error || "Krypto121 backend request failed",
+      response.status,
+      body.code,
+    );
   }
 
   return body;
@@ -279,3 +298,40 @@ export async function updateAdminUserStatus(
   });
 }
 
+
+
+export async function createAdminElevationChallenge(
+  getAccessToken: AccessTokenGetter,
+) {
+  return authedRequest<{
+    challengeId: string;
+    message: string;
+    walletAddress: `0x${string}`;
+    expiresAt: string;
+  }>(getAccessToken, "/api/admin/elevation/challenge", {
+    method: "POST",
+  });
+}
+
+export async function verifyAdminElevation(
+  getAccessToken: AccessTokenGetter,
+  input: { challengeId: string; signature: string },
+) {
+  return authedRequest<{
+    elevated: true;
+    elevatedUntil: string;
+  }>(getAccessToken, "/api/admin/elevation/verify", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function lockAdminElevation(
+  getAccessToken: AccessTokenGetter,
+) {
+  return authedRequest<{ ok: true }>(
+    getAccessToken,
+    "/api/admin/elevation",
+    { method: "DELETE" },
+  );
+}

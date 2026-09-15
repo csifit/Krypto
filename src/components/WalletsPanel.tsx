@@ -322,11 +322,12 @@ export default function WalletsPanel({
             ? bitcoinBalances[wallet.address]
             : undefined;
 
-          const stablecoinBalanceText = snapshot
-            ? ACTIVE_STABLECOINS
-                .map((asset) => `${formatBalance(snapshot.stablecoins[asset.symbol] ?? "0")} ${asset.symbol}`)
-                .join(" · ")
-            : "Loading…";
+          const stablecoinBalanceLines = snapshot
+            ? ACTIVE_STABLECOINS.map((asset) => ({
+                symbol: asset.symbol,
+                value: formatBalance(snapshot.stablecoins[asset.symbol] ?? "0"),
+              }))
+            : [];
 
           const balanceText = wallet.chainType === "bitcoin"
             ? bitcoinSnapshot?.error
@@ -336,7 +337,9 @@ export default function WalletsPanel({
                 : "Loading…"
             : snapshot?.error
               ? "Unavailable"
-              : stablecoinBalanceText;
+              : snapshot
+                ? null
+                : "Loading…";
 
           const networkFeeText =
             wallet.chainType === "bitcoin"
@@ -361,7 +364,13 @@ export default function WalletsPanel({
                   </span>
                 </div>
                 <span className="walletSummaryAddress">{shortAddress(wallet.address)}</span>
-                <strong className="walletSummaryBalance">{balanceText}</strong>
+                <strong className="walletSummaryBalance stablecoinBalanceStack">
+                  {wallet.chainType === "ethereum" && snapshot && !snapshot.error
+                    ? stablecoinBalanceLines.map((line) => (
+                        <span key={line.symbol}>{line.value} {line.symbol}</span>
+                      ))
+                    : balanceText}
+                </strong>
                 <span className="walletSummaryStatus">
                   {wallet.canPay ? "Ready" : wallet.needsConnect ? "Connect" : "View only"}
                 </span>
@@ -422,7 +431,16 @@ export default function WalletsPanel({
                   <div><span>Full address</span><strong className="breakWord">{wallet.address}</strong></div>
                   <div><span>Ownership</span><strong>{wallet.ownership}</strong></div>
                   <div><span>Connection</span><strong>{wallet.connection}</strong></div>
-                  <div><span>Balances</span><strong>{balanceText}</strong></div>
+                  <div>
+                    <span>Balances</span>
+                    <strong className="stablecoinBalanceStack">
+                      {wallet.chainType === "ethereum" && snapshot && !snapshot.error
+                        ? stablecoinBalanceLines.map((line) => (
+                            <span key={line.symbol}>{line.value} {line.symbol}</span>
+                          ))
+                        : balanceText}
+                    </strong>
+                  </div>
                   <div><span>{wallet.chainType === "bitcoin" ? "Network" : "Network fees"}</span><strong>{networkFeeText}</strong></div>
                   <div><span>Provider</span><strong>{wallet.provider}</strong></div>
                   <div><span>Environment</span><strong>{wallet.chainType === "bitcoin" ? "Mainnet" : ACTIVE_ENVIRONMENT_LABEL}</strong></div>

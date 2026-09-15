@@ -1,4 +1,4 @@
-export type CryptoNetwork = "celo-sepolia" | "celo";
+export type CryptoNetwork = "celo-sepolia" | "celo" | "base";
 
 export interface CryptoAsset {
   type: "crypto";
@@ -41,13 +41,24 @@ export interface RouteStep {
   description: string;
 }
 
+export interface RelayRouteMetadata {
+  requestId: string;
+  originChainId: number;
+  destinationChainId: number;
+  originCurrency: `0x${string}`;
+  destinationCurrency: `0x${string}`;
+  destinationTxHash?: `0x${string}`;
+}
+
 export interface PaymentRoute {
   id: string;
-  kind: "direct-celo" | "future-router";
+  kind: "direct-celo" | "relay" | "future-router";
   steps: RouteStep[];
   kryptoFeeAmount: string;
   networkFeeDescription: string;
+  routeCostAmount?: string;
   estimatedDurationSeconds?: number;
+  relay?: RelayRouteMetadata;
 }
 
 export interface PaymentQuote {

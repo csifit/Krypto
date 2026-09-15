@@ -409,8 +409,14 @@ export default function WalletDashboard({
                   <span className="cardLabel">Stablecoin balances</span>
                   <button className="textButton" onClick={() => void refreshAll()}>Refresh</button>
                 </div>
-                <strong className="balanceCompact">
-                  {portfolio.loading ? "…" : balanceSummary}
+                <strong className="balanceCompact stablecoinBalanceStack">
+                  {portfolio.loading
+                    ? "…"
+                    : ACTIVE_STABLECOINS.map((asset) => (
+                        <span key={asset.symbol}>
+                          {formatBalance(stablecoinTotals[asset.symbol] ?? 0)} {asset.symbol}
+                        </span>
+                      ))}
                 </strong>
                 <span className="cardSubtle">
                   {ownedWalletAddresses.length} owned {ownedWalletAddresses.length === 1 ? "wallet" : "wallets"} · {ACTIVE_ENVIRONMENT_LABEL}

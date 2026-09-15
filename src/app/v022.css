@@ -1,0 +1,14 @@
+.stablecoinBalanceStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  align-items: flex-start;
+}
+
+.walletSummaryBalance.stablecoinBalanceStack {
+  align-items: flex-end;
+}
+
+.walletDetailGrid .stablecoinBalanceStack {
+  align-items: flex-start;
+}

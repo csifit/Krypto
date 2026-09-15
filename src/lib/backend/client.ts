@@ -3,6 +3,7 @@ import type {
   LocalPaymentRecord,
 } from "@/lib/payments/types";
 import type { WalletLabel, WatchWallet } from "@/lib/wallet/directory";
+import type { KryptoRelayQuote, KryptoRelayStatus } from "@/lib/relay/types";
 
 type AccessTokenGetter = () => Promise<string | null>;
 
@@ -16,6 +17,7 @@ export class BackendRequestError extends Error {
     this.name = "BackendRequestError";
   }
 }
+
 export type AccountProfileSummary = {
   id: string;
   privyUserId: string;
@@ -30,9 +32,7 @@ export type AccountProfileSummary = {
 };
 
 export type AdminOverview = {
-  security: {
-    elevatedUntil: string;
-  };
+  security: { elevatedUntil: string };
   settings: {
     paymentsEnabled: boolean;
     mainnetPaymentsEnabled: boolean;
@@ -68,7 +68,6 @@ export type AdminOverview = {
   }>;
 };
 
-
 async function authedRequest<T>(
   getAccessToken: AccessTokenGetter,
   input: string,
@@ -81,10 +80,7 @@ async function authedRequest<T>(
   headers.set("Content-Type", "application/json");
   headers.set("Authorization", `Bearer ${token}`);
 
-  const response = await fetch(input, {
-    ...init,
-    headers,
-  });
+  const response = await fetch(input, { ...init, headers });
 
   const body = (await response.json().catch(() => ({}))) as {
     error?: string;
@@ -102,10 +98,7 @@ async function authedRequest<T>(
   return body;
 }
 
-export async function syncProfile(
-  getAccessToken: AccessTokenGetter,
-  walletAddress: `0x${string}`,
-) {
+export async function syncProfile(getAccessToken: AccessTokenGetter, walletAddress: `0x${string}`) {
   return authedRequest<{ profile: AccountProfileSummary }>(getAccessToken, "/api/profile", {
     method: "POST",
     body: JSON.stringify({ walletAddress }),
@@ -113,45 +106,24 @@ export async function syncProfile(
 }
 
 export async function listBeneficiaries(getAccessToken: AccessTokenGetter) {
-  const result = await authedRequest<{ beneficiaries: Beneficiary[] }>(
-    getAccessToken,
-    "/api/beneficiaries",
-  );
-  return result.beneficiaries;
+  return (await authedRequest<{ beneficiaries: Beneficiary[] }>(getAccessToken, "/api/beneficiaries")).beneficiaries;
 }
 
 export async function createBeneficiary(
   getAccessToken: AccessTokenGetter,
   input: { name: string; address: `0x${string}`; walletAddress: `0x${string}` },
 ) {
-  const result = await authedRequest<{ beneficiary: Beneficiary }>(
-    getAccessToken,
-    "/api/beneficiaries",
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-  return result.beneficiary;
+  return (await authedRequest<{ beneficiary: Beneficiary }>(getAccessToken, "/api/beneficiaries", {
+    method: "POST", body: JSON.stringify(input),
+  })).beneficiary;
 }
 
-export async function deleteBeneficiary(
-  getAccessToken: AccessTokenGetter,
-  id: string,
-) {
-  await authedRequest<{ ok: true }>(
-    getAccessToken,
-    `/api/beneficiaries?id=${encodeURIComponent(id)}`,
-    { method: "DELETE" },
-  );
+export async function deleteBeneficiary(getAccessToken: AccessTokenGetter, id: string) {
+  await authedRequest<{ ok: true }>(getAccessToken, `/api/beneficiaries?id=${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export async function listPayments(getAccessToken: AccessTokenGetter) {
-  const result = await authedRequest<{ payments: LocalPaymentRecord[] }>(
-    getAccessToken,
-    "/api/payments",
-  );
-  return result.payments;
+  return (await authedRequest<{ payments: LocalPaymentRecord[] }>(getAccessToken, "/api/payments")).payments;
 }
 
 export async function savePaymentRecord(
@@ -165,86 +137,78 @@ export async function savePaymentRecord(
   });
 }
 
+export async function getRelayQuote(
+  getAccessToken: AccessTokenGetter,
+  input: {
+    sourceWallet: `0x${string}`;
+    recipient: `0x${string}`;
+    destinationAmount: string;
+  },
+) {
+  return (await authedRequest<{ quote: KryptoRelayQuote }>(
+    getAccessToken,
+    "/api/relay/quote",
+    { method: "POST", body: JSON.stringify(input) },
+  )).quote;
+}
+
+export async function markRelaySubmitted(
+  getAccessToken: AccessTokenGetter,
+  input: { requestId: string; txHash: `0x${string}` },
+) {
+  return authedRequest<{ ok: true }>(
+    getAccessToken,
+    "/api/relay/submitted",
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export async function readRelayStatus(
+  getAccessToken: AccessTokenGetter,
+  requestId: string,
+) {
+  return (await authedRequest<{ status: KryptoRelayStatus }>(
+    getAccessToken,
+    `/api/relay/status?requestId=${encodeURIComponent(requestId)}`,
+  )).status;
+}
 
 export async function listWatchWallets(getAccessToken: AccessTokenGetter) {
-  const result = await authedRequest<{ watchWallets: WatchWallet[] }>(
-    getAccessToken,
-    "/api/watch-wallets",
-  );
-  return result.watchWallets;
+  return (await authedRequest<{ watchWallets: WatchWallet[] }>(getAccessToken, "/api/watch-wallets")).watchWallets;
 }
 
 export async function createWatchWallet(
   getAccessToken: AccessTokenGetter,
   input: { label: string; address: string; chainType: "ethereum" | "bitcoin" },
 ) {
-  const result = await authedRequest<{ watchWallet: WatchWallet }>(
-    getAccessToken,
-    "/api/watch-wallets",
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-  return result.watchWallet;
+  return (await authedRequest<{ watchWallet: WatchWallet }>(getAccessToken, "/api/watch-wallets", {
+    method: "POST", body: JSON.stringify(input),
+  })).watchWallet;
 }
 
-export async function deleteWatchWallet(
-  getAccessToken: AccessTokenGetter,
-  id: string,
-) {
-  await authedRequest<{ ok: true }>(
-    getAccessToken,
-    `/api/watch-wallets?id=${encodeURIComponent(id)}`,
-    { method: "DELETE" },
-  );
+export async function deleteWatchWallet(getAccessToken: AccessTokenGetter, id: string) {
+  await authedRequest<{ ok: true }>(getAccessToken, `/api/watch-wallets?id=${encodeURIComponent(id)}`, { method: "DELETE" });
 }
-
 
 export async function listWalletLabels(getAccessToken: AccessTokenGetter) {
-  const result = await authedRequest<{ walletLabels: WalletLabel[] }>(
-    getAccessToken,
-    "/api/wallet-labels",
-  );
-  return result.walletLabels;
+  return (await authedRequest<{ walletLabels: WalletLabel[] }>(getAccessToken, "/api/wallet-labels")).walletLabels;
 }
 
 export async function saveWalletLabel(
   getAccessToken: AccessTokenGetter,
   input: { address: `0x${string}`; label: string },
 ) {
-  const result = await authedRequest<{ walletLabel: WalletLabel }>(
-    getAccessToken,
-    "/api/wallet-labels",
-    {
-      method: "PUT",
-      body: JSON.stringify(input),
-    },
-  );
-  return result.walletLabel;
+  return (await authedRequest<{ walletLabel: WalletLabel }>(getAccessToken, "/api/wallet-labels", {
+    method: "PUT", body: JSON.stringify(input),
+  })).walletLabel;
 }
 
-export async function deleteWalletLabel(
-  getAccessToken: AccessTokenGetter,
-  address: `0x${string}`,
-) {
-  await authedRequest<{ ok: true }>(
-    getAccessToken,
-    `/api/wallet-labels?address=${encodeURIComponent(address)}`,
-    { method: "DELETE" },
-  );
+export async function deleteWalletLabel(getAccessToken: AccessTokenGetter, address: `0x${string}`) {
+  await authedRequest<{ ok: true }>(getAccessToken, `/api/wallet-labels?address=${encodeURIComponent(address)}`, { method: "DELETE" });
 }
 
-
-export async function readBitcoinWatchBalance(
-  getAccessToken: AccessTokenGetter,
-  address: string,
-) {
-  return authedRequest<{
-    balance: string;
-    confirmed: string;
-    pending: string;
-  }>(
+export async function readBitcoinWatchBalance(getAccessToken: AccessTokenGetter, address: string) {
+  return authedRequest<{ balance: string; confirmed: string; pending: string }>(
     getAccessToken,
     `/api/bitcoin/balance?address=${encodeURIComponent(address)}`,
   );
@@ -259,11 +223,9 @@ export async function authorizePayment(
     network: "celo-sepolia" | "celo";
   },
 ) {
-  return authedRequest<{ authorized: true }>(
-    getAccessToken,
-    "/api/payments/authorize",
-    { method: "POST", body: JSON.stringify(input) },
-  );
+  return authedRequest<{ authorized: true }>(getAccessToken, "/api/payments/authorize", {
+    method: "POST", body: JSON.stringify(input),
+  });
 }
 
 export async function getAdminOverview(getAccessToken: AccessTokenGetter) {
@@ -272,66 +234,42 @@ export async function getAdminOverview(getAccessToken: AccessTokenGetter) {
 
 export async function updateAdminSettings(
   getAccessToken: AccessTokenGetter,
-  input: {
-    paymentsEnabled: boolean;
-    mainnetPaymentsEnabled: boolean;
-    maxPaymentAmount: string | null;
-  },
+  input: { paymentsEnabled: boolean; mainnetPaymentsEnabled: boolean; maxPaymentAmount: string | null },
 ) {
   return authedRequest<{ ok: true }>(getAccessToken, "/api/admin/settings", {
-    method: "PATCH",
-    body: JSON.stringify(input),
+    method: "PATCH", body: JSON.stringify(input),
   });
 }
 
 export async function updateAdminUserStatus(
   getAccessToken: AccessTokenGetter,
-  input: {
-    targetUserId: string;
-    status: "active" | "suspended" | "blocked";
-    reason?: string;
-  },
+  input: { targetUserId: string; status: "active" | "suspended" | "blocked"; reason?: string },
 ) {
   return authedRequest<{ ok: true }>(getAccessToken, "/api/admin/user-status", {
-    method: "PATCH",
-    body: JSON.stringify(input),
+    method: "PATCH", body: JSON.stringify(input),
   });
 }
 
-
-
-export async function createAdminElevationChallenge(
-  getAccessToken: AccessTokenGetter,
-) {
+export async function createAdminElevationChallenge(getAccessToken: AccessTokenGetter) {
   return authedRequest<{
     challengeId: string;
     message: string;
     walletAddress: `0x${string}`;
     expiresAt: string;
-  }>(getAccessToken, "/api/admin/elevation/challenge", {
-    method: "POST",
-  });
+  }>(getAccessToken, "/api/admin/elevation/challenge", { method: "POST" });
 }
 
 export async function verifyAdminElevation(
   getAccessToken: AccessTokenGetter,
   input: { challengeId: string; signature: string },
 ) {
-  return authedRequest<{
-    elevated: true;
-    elevatedUntil: string;
-  }>(getAccessToken, "/api/admin/elevation/verify", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  return authedRequest<{ elevated: true; elevatedUntil: string }>(
+    getAccessToken,
+    "/api/admin/elevation/verify",
+    { method: "POST", body: JSON.stringify(input) },
+  );
 }
 
-export async function lockAdminElevation(
-  getAccessToken: AccessTokenGetter,
-) {
-  return authedRequest<{ ok: true }>(
-    getAccessToken,
-    "/api/admin/elevation",
-    { method: "DELETE" },
-  );
+export async function lockAdminElevation(getAccessToken: AccessTokenGetter) {
+  return authedRequest<{ ok: true }>(getAccessToken, "/api/admin/elevation", { method: "DELETE" });
 }

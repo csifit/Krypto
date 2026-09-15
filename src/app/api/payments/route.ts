@@ -83,25 +83,18 @@ export async function POST(request: Request) {
     if (!record || record.status !== "settled" || !validTxHash(record.txHash)) {
       return Response.json({ error: "Invalid payment record" }, { status: 400 });
     }
-    if (
-      !isAddress(record.intent.sourceWallet) ||
-      !isAddress(record.intent.destination)
-    ) {
+    if (!isAddress(record.intent.sourceWallet) || !isAddress(record.intent.destination)) {
       return Response.json({ error: "Invalid payment wallet" }, { status: 400 });
     }
 
     const linkedWallets = await getPrivyLinkedEvmAddresses(userId);
-    const accountWalletOwned = linkedWallets.has(body.walletAddress.toLowerCase());
-    const sourceWalletOwned = linkedWallets.has(record.intent.sourceWallet.toLowerCase());
-
-    if (!accountWalletOwned) {
+    if (!linkedWallets.has(body.walletAddress.toLowerCase())) {
       return Response.json(
         { error: "Account wallet is not linked to this Krypto121 account" },
         { status: 403 },
       );
     }
-
-    if (!sourceWalletOwned) {
+    if (!linkedWallets.has(record.intent.sourceWallet.toLowerCase())) {
       return Response.json(
         { error: "Source wallet is not linked to this Krypto121 account" },
         { status: 403 },
@@ -110,10 +103,9 @@ export async function POST(request: Request) {
 
     let verified;
     try {
-      verified = await verifyPaymentSettlement(record);
+      verified = await verifyPaymentSettlement(record, userId);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Could not verify blockchain settlement";
+      const message = error instanceof Error ? error.message : "Could not verify settlement";
       return Response.json({ error: message }, { status: 422 });
     }
 
@@ -155,6 +147,7 @@ export async function POST(request: Request) {
       }
       throw error;
     }
+
     return Response.json({ ok: true, verified: true });
   } catch (error) {
     if (error instanceof AuthError) {

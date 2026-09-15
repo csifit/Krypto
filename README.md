@@ -1,39 +1,39 @@
-# Krypto121 v0.21 — Real multi-asset model
+# Krypto121 v0.22 — Relay
 
-Overlay for the current v0.20 project.
-
-## Production
-
-Krypto121 now supports two real stablecoins on Celo Mainnet:
+v0.22 adds Krypto121's first real alternative route:
 
 ```text
-USDT
-USDC
+Celo USDC → Base USDC
 ```
 
-Both can be sent and received directly.
+Relay is selected automatically only when the payment intent requires the cross-network route.
 
-The Krypto121 embedded wallet pays Celo network fees in the same selected stablecoin through Celo fee abstraction.
+Normal users do not choose a provider.
 
-## Why only Celo in this milestone?
+## UI refinement
 
-This milestone expands the **asset model**, not the route provider surface.
-
-Keeping USDT and USDC on the already-live Celo network gives Krypto121 a real multi-asset model without introducing Base or another chain before the first Relay integration.
-
-The next routing milestone can then use the same asset registry to model source and destination assets on different networks.
-
-## No migration
-
-No Supabase migration and no new environment variables.
-
-Production stays:
+Stablecoin balances are now shown vertically:
 
 ```text
-NEXT_PUBLIC_KRYPTO_NETWORK=mainnet
+12.50 USDT
+8.00 USDC
 ```
 
-Apply the overlay and run:
+instead of side by side.
+
+## Migration
+
+Apply:
+
+`supabase/migrations/202609150008_relay_quotes.sql`
+
+## Environment
+
+`RELAY_API_KEY` is optional. It is server-side only.
+
+Relay's default unauthenticated limits are sufficient for initial low-volume integration. Add an API key later when Krypto121 needs higher throughput.
+
+## Build
 
 ```powershell
 Remove-Item -Recurse -Force .next

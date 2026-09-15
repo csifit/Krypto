@@ -11,8 +11,11 @@ import {
 } from "@/lib/celo";
 import {
   ACTIVE_STABLECOINS,
+  CELO_USDC,
   DEFAULT_STABLECOIN,
+  PAYMENT_DESTINATIONS,
   getActiveStablecoin,
+  type PaymentDestination,
   type StablecoinSymbol,
 } from "@/lib/assets";
 import { sendStablecoin } from "@/lib/blockchain/usdt";
@@ -22,7 +25,15 @@ import {
   createDirectCeloIntent,
   quoteDirectCeloIntent,
 } from "@/lib/payments/directCelo";
-import { authorizePayment, savePaymentRecord } from "@/lib/backend/client";
+import { createRelayPayment } from "@/lib/payments/relay";
+import {
+  authorizePayment,
+  getRelayQuote,
+  markRelaySubmitted,
+  readRelayStatus,
+  savePaymentRecord,
+} from "@/lib/backend/client";
+import { executeRelayQuote } from "@/lib/relay/execution";
 import QrScanner from "@/components/QrScanner";
 import { parsePaymentRequestPayload, type PaymentRequest } from "@/lib/payments/paymentRequest";
 import type {
@@ -31,6 +42,7 @@ import type {
   PaymentQuote,
 } from "@/lib/payments/types";
 import type { PaymentSourceWallet } from "@/lib/wallet/types";
+import type { KryptoRelayQuote } from "@/lib/relay/types";
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -44,6 +56,25 @@ function compactAmount(value?: string) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 6,
   });
+}
+
+async function waitForRelaySettlement(
+  getAccessToken: () => Promise<string | null>,
+  requestId: string,
+) {
+  for (let attempt = 0; attempt < 90; attempt += 1) {
+    const status = await readRelayStatus(getAccessToken, requestId);
+
+    if (status.status === "success") return status;
+    if (status.status === "failure") throw new Error("Relay could not complete the payment");
+    if (status.status === "refund" || status.status === "fallback") {
+      throw new Error("Relay refunded the payment instead of settling it");
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 1000));
+  }
+
+  throw new Error("Relay is still processing this payment. Please check again shortly.");
 }
 
 export default function SendPanel({
@@ -62,6 +93,7 @@ export default function SendPanel({
   onSent(): Promise<void>;
 }) {
   const [sourceId, setSourceId] = useState(sourceWallets[0]?.id ?? "");
+  const [destination, setDestination] = useState<PaymentDestination>("celo");
   const [assetSymbol, setAssetSymbol] = useState<StablecoinSymbol>(
     initialRequest?.asset ?? DEFAULT_STABLECOIN.symbol,
   );
@@ -71,7 +103,8 @@ export default function SendPanel({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [intent, setIntent] = useState<PaymentIntent | null>(null);
   const [quote, setQuote] = useState<PaymentQuote | null>(null);
-  const [stage, setStage] = useState<"form" | "review" | "sending" | "success">("form");
+  const [relayExecutionQuote, setRelayExecutionQuote] = useState<KryptoRelayQuote | null>(null);
+  const [stage, setStage] = useState<"form" | "quoting" | "review" | "sending" | "success">("form");
   const [error, setError] = useState<string | null>(null);
   const [hash, setHash] = useState<`0x${string}` | null>(null);
   const [recordWarning, setRecordWarning] = useState<string | null>(null);
@@ -79,7 +112,12 @@ export default function SendPanel({
 
   const selectedSource =
     sourceWallets.find((source) => source.id === sourceId) ?? sourceWallets[0];
-  const selectedAsset = getActiveStablecoin(assetSymbol) ?? DEFAULT_STABLECOIN;
+
+  const selectedAsset = destination === "base"
+    ? CELO_USDC
+    : (getActiveStablecoin(assetSymbol) ?? DEFAULT_STABLECOIN);
+
+  const isRelayRoute = destination === "base";
   const payFeesInStablecoin = Boolean(
     IS_MAINNET &&
     selectedSource?.embedded &&
@@ -88,6 +126,7 @@ export default function SendPanel({
 
   useEffect(() => {
     if (!initialRequest) return;
+    setDestination("celo");
     setRecipient(initialRequest.recipient);
     setAssetSymbol(initialRequest.asset);
     setAmount(initialRequest.amount ?? "");
@@ -104,6 +143,14 @@ export default function SendPanel({
     if (match) setSourceId(match.id);
   }, [initialSourceAddress, sourceWallets]);
 
+  function clearQuote() {
+    setIntent(null);
+    setQuote(null);
+    setRelayExecutionQuote(null);
+    setError(null);
+    setStage("form");
+  }
+
   function applyScannedPayment(value: string) {
     const request = parsePaymentRequestPayload(value);
 
@@ -114,15 +161,13 @@ export default function SendPanel({
       return;
     }
 
+    setDestination("celo");
     setRecipient(request.recipient);
     setAssetSymbol(request.asset);
     setAmount(request.amount ?? "");
     setMemo(request.memo ?? "");
     setScannerOpen(false);
-    setError(null);
-    setIntent(null);
-    setQuote(null);
-    setStage("form");
+    clearQuote();
   }
 
   const sourceBalance = useStablecoinBalance(
@@ -134,7 +179,7 @@ export default function SendPanel({
     (item) => item.address.toLowerCase() === recipient.toLowerCase(),
   );
 
-  const readiness = usePaymentReadiness({
+  const directReadiness = usePaymentReadiness({
     sourceAddress: selectedSource?.wallet.address,
     sourceBalance: sourceBalance.balance,
     sourceBalanceLoading: sourceBalance.loading,
@@ -145,80 +190,94 @@ export default function SendPanel({
     payFeesInStablecoin,
   });
 
+  const basicReady = Boolean(
+    selectedSource &&
+    recipient &&
+    isAddress(recipient) &&
+    Number.isFinite(Number(amount)) &&
+    Number(amount) > 0 &&
+    !sourceBalance.loading &&
+    !sourceBalance.error &&
+    Number(amount) <= Number(sourceBalance.balance),
+  );
+
   const validationError = useMemo(() => {
     if (!recipient || !amount) return null;
     if (!isAddress(recipient)) return "Enter a valid wallet address";
 
     const number = Number(amount);
-    if (!Number.isFinite(number) || number <= 0) {
-      return "Amount must be greater than zero";
-    }
+    if (!Number.isFinite(number) || number <= 0) return "Amount must be greater than zero";
     if (number > Number(sourceBalance.balance)) {
       return `Amount exceeds the selected wallet ${selectedAsset.symbol} balance`;
     }
     return null;
   }, [recipient, amount, sourceBalance.balance, selectedAsset.symbol]);
 
-  const estimatedTotalDebit = useMemo(() => {
-    if (!payFeesInStablecoin || !readiness.estimatedNetworkFeeAmount || !amount) {
-      return undefined;
-    }
-    const paymentAmount = Number(amount);
-    const feeAmount = Number(readiness.estimatedNetworkFeeAmount);
-    if (!Number.isFinite(paymentAmount) || !Number.isFinite(feeAmount)) {
-      return undefined;
-    }
-    return compactAmount(String(paymentAmount + feeAmount));
-  }, [amount, payFeesInStablecoin, readiness.estimatedNetworkFeeAmount]);
-
-  function review() {
+  async function review() {
     setError(null);
 
-    if (!selectedSource) {
-      setError("Connect a wallet before creating a payment");
-      return;
-    }
-    if (!recipient || !amount) {
-      setError("Enter a recipient and amount");
-      return;
-    }
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-    if (readiness.checking) {
-      setError("Wait for payment readiness checks to finish");
-      return;
-    }
-    if (!readiness.ready) {
-      setError("Resolve the payment readiness checks before continuing");
+    if (!selectedSource) return setError("Connect a wallet before creating a payment");
+    if (!recipient || !amount) return setError("Enter a recipient and amount");
+    if (validationError) return setError(validationError);
+
+    if (!isRelayRoute) {
+      if (directReadiness.checking) return setError("Wait for payment readiness checks to finish");
+      if (!directReadiness.ready) return setError("Resolve the payment readiness checks before continuing");
+
+      try {
+        const nextIntent = createDirectCeloIntent({
+          sourceWallet: selectedSource.wallet.address,
+          destination: recipient,
+          amount,
+          assetSymbol: selectedAsset.symbol,
+          memo,
+        });
+        nextIntent.status = "quoted";
+
+        const feeDescription =
+          payFeesInStablecoin && directReadiness.estimatedNetworkFeeAmount
+            ? `Estimated ~${compactAmount(directReadiness.estimatedNetworkFeeAmount)} ${selectedAsset.symbol}`
+            : "Paid by the source wallet";
+
+        const nextQuote = quoteDirectCeloIntent(nextIntent, {
+          networkFeeDescription: feeDescription,
+        });
+
+        setIntent(nextIntent);
+        setQuote(nextQuote);
+        setStage("review");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not create payment quote");
+      }
       return;
     }
 
+    if (!basicReady) {
+      return setError("Complete the payment details before requesting a route");
+    }
+
+    setStage("quoting");
     try {
-      const nextIntent = createDirectCeloIntent({
+      const relayQuote = await getRelayQuote(getAccessToken, {
         sourceWallet: selectedSource.wallet.address,
-        destination: recipient,
-        amount,
-        assetSymbol: selectedAsset.symbol,
-        memo,
-      });
-      nextIntent.status = "quoted";
-
-      const feeDescription =
-        payFeesInStablecoin && readiness.estimatedNetworkFeeAmount
-          ? `Estimated ~${compactAmount(readiness.estimatedNetworkFeeAmount)} ${selectedAsset.symbol}`
-          : "Paid by the source wallet";
-
-      const nextQuote = quoteDirectCeloIntent(nextIntent, {
-        networkFeeDescription: feeDescription,
+        recipient: recipient as `0x${string}`,
+        destinationAmount: amount,
       });
 
-      setIntent(nextIntent);
-      setQuote(nextQuote);
+      if (Number(relayQuote.sourceAmount) > Number(sourceBalance.balance)) {
+        throw new Error(
+          `This route needs ${relayQuote.sourceAmount} USDC, but the selected wallet has ${sourceBalance.balance} USDC.`,
+        );
+      }
+
+      const payment = createRelayPayment(relayQuote, memo);
+      setRelayExecutionQuote(relayQuote);
+      setIntent(payment.intent);
+      setQuote(payment.quote);
       setStage("review");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create payment quote");
+      setStage("form");
+      setError(err instanceof Error ? err.message : "Could not quote cross-network payment");
     }
   }
 
@@ -232,19 +291,11 @@ export default function SendPanel({
     }
 
     const executionSource = sourceWallets.find(
-      (source) =>
-        source.wallet.address.toLowerCase() === intent.sourceWallet.toLowerCase(),
+      (source) => source.wallet.address.toLowerCase() === intent.sourceWallet.toLowerCase(),
     );
 
     if (!executionSource) {
-      setError("The selected source wallet is no longer connected. Connect it again and review the payment.");
-      setStage("form");
-      return;
-    }
-
-    const executionAsset = getActiveStablecoin(intent.sourceAsset.symbol);
-    if (!executionAsset) {
-      setError("The payment asset is no longer supported.");
+      setError("The selected source wallet is no longer connected.");
       setStage("form");
       return;
     }
@@ -257,23 +308,53 @@ export default function SendPanel({
         accountWalletAddress,
         sourceWallet: executionSource.wallet.address,
         amount: intent.sourceAmount,
-        network: intent.sourceAsset.network,
+        network: "celo",
       });
 
       intent.status = "executing";
-      const txHash = await sendStablecoin(
-        executionSource.wallet,
-        intent.destination,
-        intent.sourceAmount,
-        executionAsset.symbol,
-        {
-          payFeesInStablecoin: Boolean(
-            IS_MAINNET &&
-            executionSource.embedded &&
-            executionAsset.feeCurrencyAdapter,
-          ),
-        },
-      );
+
+      let txHash: `0x${string}`;
+
+      if (quote.route.kind === "relay") {
+        if (!relayExecutionQuote || !quote.route.relay) {
+          throw new Error("Relay execution quote is unavailable. Review the payment again.");
+        }
+
+        const executed = await executeRelayQuote(executionSource, relayExecutionQuote);
+        txHash = executed.depositTxHash;
+
+        await markRelaySubmitted(getAccessToken, {
+          requestId: quote.route.relay.requestId,
+          txHash,
+        });
+
+        const relayStatus = await waitForRelaySettlement(
+          getAccessToken,
+          quote.route.relay.requestId,
+        );
+
+        if (relayStatus.destinationTxHash) {
+          quote.route.relay.destinationTxHash = relayStatus.destinationTxHash;
+        }
+      } else {
+        const executionAsset = getActiveStablecoin(intent.sourceAsset.symbol);
+        if (!executionAsset) throw new Error("The payment asset is no longer supported.");
+
+        txHash = await sendStablecoin(
+          executionSource.wallet,
+          intent.destination,
+          intent.sourceAmount,
+          executionAsset.symbol,
+          {
+            payFeesInStablecoin: Boolean(
+              IS_MAINNET &&
+              executionSource.embedded &&
+              executionAsset.feeCurrencyAdapter,
+            ),
+          },
+        );
+      }
+
       intent.status = "settled";
 
       const record = {
@@ -302,21 +383,19 @@ export default function SendPanel({
     } catch (err) {
       intent.status = "failed";
       setStage("review");
-      setError(
-        err instanceof Error
-          ? err.message
-          : `Could not send ${selectedAsset.symbol}`,
-      );
+      setError(err instanceof Error ? err.message : "Could not complete payment");
     }
   }
 
   function reset() {
+    setDestination("celo");
     setRecipient("");
     setAssetSymbol(DEFAULT_STABLECOIN.symbol);
     setAmount("");
     setMemo("");
     setIntent(null);
     setQuote(null);
+    setRelayExecutionQuote(null);
     setError(null);
     setHash(null);
     setRecordWarning(null);
@@ -329,23 +408,24 @@ export default function SendPanel({
         (source) => source.wallet.address.toLowerCase() === intent.sourceWallet.toLowerCase(),
       )
     : undefined;
+
   const intentSymbol =
-    intent?.sourceAsset.type === "crypto"
-      ? intent.sourceAsset.symbol
+    intent?.destinationAsset.type === "crypto"
+      ? intent.destinationAsset.symbol
       : selectedAsset.symbol;
 
-  if (stage === "success" && hash && intent) {
+  if (stage === "success" && hash && intent && quote) {
+    const relay = quote.route.kind === "relay" ? quote.route.relay : undefined;
+
     return (
       <section className="sendPanel">
         <span className="status">Settled</span>
         <h2>Payment sent</h2>
         <p>
-          {intent.sourceAmount} {intentSymbol} was confirmed through Krypto121&apos;s direct
-          route on {ACTIVE_CELO_CHAIN.name}.{!IS_MAINNET ? " No real money was used." : ""}
+          {intent.destinationAmount ?? intent.sourceAmount} {intentSymbol} reached the recipient
+          {relay ? " on Base" : ` on ${ACTIVE_CELO_CHAIN.name}`}.
         </p>
-        <p className="hint">
-          From: {intentSource?.label ?? shortAddress(intent.sourceWallet)}
-        </p>
+        <p className="hint">From: {intentSource?.label ?? shortAddress(intent.sourceWallet)}</p>
         {intent.memo ? <p className="hint">Memo: {intent.memo}</p> : null}
         {recordWarning ? <p className="errorText">{recordWarning}</p> : null}
 
@@ -353,21 +433,11 @@ export default function SendPanel({
           <summary>Technical details</summary>
           <div className="technicalDetailsBody">
             <div>
-              <span>Network</span>
-              <strong>{ACTIVE_CELO_CHAIN.name}</strong>
+              <span>Route</span>
+              <strong>{relay ? "Celo → Base · Relay" : "Direct Celo"}</strong>
             </div>
             <div>
-              <span>Asset</span>
-              <strong>{intentSymbol}</strong>
-            </div>
-            {IS_MAINNET && intentSource?.embedded ? (
-              <div>
-                <span>Network fee</span>
-                <strong>Paid in {intentSymbol}</strong>
-              </div>
-            ) : null}
-            <div>
-              <span>Transaction ID</span>
+              <span>Origin transaction</span>
               <strong className="breakWord">{hash}</strong>
             </div>
             <a
@@ -376,21 +446,31 @@ export default function SendPanel({
               target="_blank"
               rel="noreferrer"
             >
-              View on blockchain
+              View origin transaction
             </a>
+            {relay?.destinationTxHash ? (
+              <a
+                className="inlineLink"
+                href={`https://basescan.org/tx/${relay.destinationTxHash}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View destination transaction
+              </a>
+            ) : null}
           </div>
         </details>
 
         <div className="actions">
-          <button className="primaryButton" onClick={reset}>
-            Send another
-          </button>
+          <button className="primaryButton" onClick={reset}>Send another</button>
         </div>
       </section>
     );
   }
 
   if ((stage === "review" || stage === "sending") && intent && quote) {
+    const isRelay = quote.route.kind === "relay";
+
     return (
       <section className="sendPanel">
         <p className="eyebrow">Payment intent quoted</p>
@@ -399,64 +479,62 @@ export default function SendPanel({
         <div className="reviewRows">
           <div>
             <span>Pay from</span>
-            <strong>
-              {intentSource?.label ?? shortAddress(intent.sourceWallet)} · {shortAddress(intent.sourceWallet)}
-            </strong>
+            <strong>{intentSource?.label ?? shortAddress(intent.sourceWallet)} · {shortAddress(intent.sourceWallet)}</strong>
           </div>
           <div>
             <span>Recipient</span>
-            <strong className="breakWord">
-              {selectedBeneficiary?.name ?? intent.destination}
-            </strong>
+            <strong className="breakWord">{selectedBeneficiary?.name ?? intent.destination}</strong>
+          </div>
+          <div>
+            <span>Destination</span>
+            <strong>{isRelay ? "Base" : "Celo"}</strong>
           </div>
           <div>
             <span>Recipient gets</span>
             <strong>{quote.destinationAmount} {intentSymbol}</strong>
           </div>
+          {isRelay ? (
+            <>
+              <div>
+                <span>You pay</span>
+                <strong>{quote.sourceAmount} USDC</strong>
+              </div>
+              <div>
+                <span>Route cost</span>
+                <strong>~{quote.route.routeCostAmount ?? "0"} USDC</strong>
+              </div>
+            </>
+          ) : (
+            <div>
+              <span>Network fee</span>
+              <strong>{quote.route.networkFeeDescription}</strong>
+            </div>
+          )}
           <div>
             <span>Krypto121 fee</span>
             <strong>{quote.route.kryptoFeeAmount} {intentSymbol}</strong>
           </div>
-          <div>
-            <span>Network fee</span>
-            <strong>{quote.route.networkFeeDescription}</strong>
-          </div>
-          {estimatedTotalDebit ? (
-            <div>
-              <span>Estimated total</span>
-              <strong>~{estimatedTotalDebit} {intentSymbol}</strong>
-            </div>
-          ) : null}
           {intent.memo ? (
-            <div>
-              <span>Memo</span>
-              <strong>{intent.memo}</strong>
-            </div>
+            <div><span>Memo</span><strong>{intent.memo}</strong></div>
           ) : null}
         </div>
 
         <p className="hint">
-          {IS_MAINNET && intentSource?.embedded
-            ? `Krypto121 pays the network fee from ${intentSymbol} in the same wallet. No separate CELO balance is required.`
-            : "Krypto121 creates the route, but the selected source wallet must approve the transaction."}
+          {isRelay
+            ? "Krypto121 selected the cross-network route automatically. The recipient receives USDC on Base."
+            : IS_MAINNET && intentSource?.embedded
+              ? `Network fees are paid from ${intentSymbol} in the same wallet.`
+              : "The selected source wallet must approve the transaction."}
         </p>
 
         {error ? <p className="errorText">{error}</p> : null}
 
         <div className="actions">
-          <button
-            className="secondaryButton"
-            onClick={() => setStage("form")}
-            disabled={stage === "sending"}
-          >
+          <button className="secondaryButton" onClick={() => setStage("form")} disabled={stage === "sending"}>
             Back
           </button>
-          <button
-            className="primaryButton"
-            onClick={() => void confirm()}
-            disabled={stage === "sending"}
-          >
-            {stage === "sending" ? "Waiting for confirmation…" : "Approve & send"}
+          <button className="primaryButton" onClick={() => void confirm()} disabled={stage === "sending"}>
+            {stage === "sending" ? (isRelay ? "Completing cross-network payment…" : "Waiting for confirmation…") : "Approve & send"}
           </button>
         </div>
       </section>
@@ -474,7 +552,7 @@ export default function SendPanel({
           value={selectedSource?.id ?? ""}
           onChange={(event) => {
             setSourceId(event.target.value);
-            setError(null);
+            clearQuote();
           }}
         >
           {sourceWallets.map((source) => (
@@ -485,7 +563,28 @@ export default function SendPanel({
         </select>
       </label>
 
-      {ACTIVE_STABLECOINS.length > 1 ? (
+      {IS_MAINNET ? (
+        <label className="field">
+          <span>Pay to</span>
+          <select
+            value={destination}
+            onChange={(event) => {
+              const next = event.target.value as PaymentDestination;
+              setDestination(next);
+              if (next === "base") setAssetSymbol("USDC");
+              clearQuote();
+            }}
+          >
+            {PAYMENT_DESTINATIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label} · {option.detail}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
+      {!isRelayRoute && ACTIVE_STABLECOINS.length > 1 ? (
         <label className="field">
           <span>Asset</span>
           <select
@@ -493,9 +592,7 @@ export default function SendPanel({
             onChange={(event) => {
               setAssetSymbol(event.target.value as StablecoinSymbol);
               setAmount("");
-              setIntent(null);
-              setQuote(null);
-              setError(null);
+              clearQuote();
             }}
           >
             {ACTIVE_STABLECOINS.map((asset) => (
@@ -505,7 +602,9 @@ export default function SendPanel({
             ))}
           </select>
         </label>
-      ) : null}
+      ) : (
+        isRelayRoute ? <p className="hint">Base payments currently use USDC.</p> : null
+      )}
 
       {beneficiaries.length ? (
         <label className="field">
@@ -515,9 +614,7 @@ export default function SendPanel({
           }}>
             <option value="">Choose beneficiary…</option>
             {beneficiaries.map((beneficiary) => (
-              <option key={beneficiary.id} value={beneficiary.address}>
-                {beneficiary.name}
-              </option>
+              <option key={beneficiary.id} value={beneficiary.address}>{beneficiary.name}</option>
             ))}
           </select>
         </label>
@@ -526,16 +623,18 @@ export default function SendPanel({
       <label className="field">
         <span className="fieldLabelWithAction">
           <span>Recipient wallet address</span>
-          <button
-            className="textButton"
-            type="button"
-            onClick={() => {
-              setScannerOpen((value) => !value);
-              setError(null);
-            }}
-          >
-            {scannerOpen ? "Close scanner" : "Scan QR"}
-          </button>
+          {!isRelayRoute ? (
+            <button
+              className="textButton"
+              type="button"
+              onClick={() => {
+                setScannerOpen((value) => !value);
+                setError(null);
+              }}
+            >
+              {scannerOpen ? "Close scanner" : "Scan QR"}
+            </button>
+          ) : null}
         </span>
         <input
           value={recipient}
@@ -545,19 +644,21 @@ export default function SendPanel({
         />
       </label>
 
-      {scannerOpen ? (
-        <QrScanner
-          onScan={applyScannedPayment}
-          onClose={() => setScannerOpen(false)}
-        />
+      {scannerOpen && !isRelayRoute ? (
+        <QrScanner onScan={applyScannedPayment} onClose={() => setScannerOpen(false)} />
       ) : null}
 
       <label className="field">
-        <span>Amount</span>
+        <span>{isRelayRoute ? "Recipient amount" : "Amount"}</span>
         <div className="amountField">
           <input
             value={amount}
-            onChange={(event) => setAmount(event.target.value)}
+            onChange={(event) => {
+              setAmount(event.target.value);
+              setIntent(null);
+              setQuote(null);
+              setRelayExecutionQuote(null);
+            }}
             inputMode="decimal"
             placeholder="0.00"
           />
@@ -575,37 +676,50 @@ export default function SendPanel({
         />
       </label>
 
-      <div className="paymentReadiness">
-        <div className="paymentReadinessHeader">
-          <div>
-            <p className="eyebrow">Payment readiness</p>
-            <h3>{readiness.ready ? "Ready to review" : "Preflight checks"}</h3>
-          </div>
-          <span className={`readinessOverall readinessOverall-${readiness.ready ? "ready" : readiness.checking ? "checking" : "pending"}`}>
-            {readiness.ready ? "Ready" : readiness.checking ? "Checking" : "Not ready"}
-          </span>
-        </div>
-
-        <div className="readinessList">
-          {[readiness.recipient, readiness.funds, readiness.network, readiness.route].map((check) => (
-            <div className="readinessRow" key={check.label}>
-              <span className={`readinessDot readinessDot-${check.state}`} aria-hidden="true" />
-              <div>
-                <strong>{check.label}</strong>
-                <span>{check.detail}</span>
-              </div>
+      {!isRelayRoute ? (
+        <div className="paymentReadiness">
+          <div className="paymentReadinessHeader">
+            <div>
+              <p className="eyebrow">Payment readiness</p>
+              <h3>{directReadiness.ready ? "Ready to review" : "Preflight checks"}</h3>
             </div>
-          ))}
+            <span className={`readinessOverall readinessOverall-${directReadiness.ready ? "ready" : directReadiness.checking ? "checking" : "pending"}`}>
+              {directReadiness.ready ? "Ready" : directReadiness.checking ? "Checking" : "Not ready"}
+            </span>
+          </div>
+          <div className="readinessList">
+            {[directReadiness.recipient, directReadiness.funds, directReadiness.network, directReadiness.route].map((check) => (
+              <div className="readinessRow" key={check.label}>
+                <span className={`readinessDot readinessDot-${check.state}`} aria-hidden="true" />
+                <div><strong>{check.label}</strong><span>{check.detail}</span></div>
+              </div>
+            ))}
+          </div>
         </div>
-
-        {readiness.network.state === "blocked" && readiness.route.state === "ready" ? (
-          <p className="walletDirectoryNote">
-            {payFeesInStablecoin
-              ? `Keep a small amount of ${selectedAsset.symbol} available for the network fee.`
-              : "This connected wallet needs network fee funds before it can send."}
-          </p>
-        ) : null}
-      </div>
+      ) : (
+        <div className="paymentReadiness">
+          <div className="paymentReadinessHeader">
+            <div>
+              <p className="eyebrow">Payment readiness</p>
+              <h3>{basicReady ? "Ready to quote" : "Complete payment details"}</h3>
+            </div>
+          </div>
+          <div className="readinessList">
+            <div className="readinessRow">
+              <span className={`readinessDot readinessDot-${recipient && isAddress(recipient) ? "ready" : "waiting"}`} />
+              <div><strong>Recipient</strong><span>{recipient && isAddress(recipient) ? "Ready" : "Enter a Base wallet address"}</span></div>
+            </div>
+            <div className="readinessRow">
+              <span className={`readinessDot readinessDot-${basicReady ? "ready" : "waiting"}`} />
+              <div><strong>Funds</strong><span>{sourceBalance.loading ? "Checking" : `${sourceBalance.balance} USDC available`}</span></div>
+            </div>
+            <div className="readinessRow">
+              <span className="readinessDot readinessDot-waiting" />
+              <div><strong>Route</strong><span>Live Relay quote at review</span></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <p className="hint">
         Available in selected wallet: {sourceBalance.loading ? "…" : sourceBalance.balance} {selectedAsset.symbol}
@@ -617,10 +731,14 @@ export default function SendPanel({
       <div className="actions">
         <button
           className="primaryButton"
-          onClick={review}
-          disabled={!selectedSource || !readiness.ready}
+          onClick={() => void review()}
+          disabled={
+            !selectedSource ||
+            stage === "quoting" ||
+            (isRelayRoute ? !basicReady : !directReadiness.ready)
+          }
         >
-          {readiness.checking ? "Checking payment…" : "Review payment"}
+          {stage === "quoting" ? "Finding route…" : "Review payment"}
         </button>
       </div>
     </section>

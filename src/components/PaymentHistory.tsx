@@ -39,9 +39,7 @@ export default function PaymentHistory({ refreshKey }: { refreshKey: number }) {
     }
 
     void load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [getAccessToken, refreshKey]);
 
   return (
@@ -54,52 +52,62 @@ export default function PaymentHistory({ refreshKey }: { refreshKey: number }) {
 
       {loading ? <p className="hint">Loading payments…</p> : null}
       {error ? <p className="errorText">{error}</p> : null}
-
-      {!loading && !error && records.length === 0 ? (
-        <p className="hint">No recorded payments yet.</p>
-      ) : null}
+      {!loading && !error && records.length === 0 ? <p className="hint">No recorded payments yet.</p> : null}
 
       {records.length ? (
         <div className="historyList">
           {records.map((record) => {
-            const network =
+            const sourceNetwork =
               record.intent.sourceAsset.type === "crypto"
                 ? (record.intent.sourceAsset.network as CeloPaymentNetwork)
                 : "celo-sepolia";
-            const chain = getCeloChainForPaymentNetwork(network);
+            const chain = getCeloChainForPaymentNetwork(sourceNetwork === "celo" ? "celo" : "celo-sepolia");
+            const relay = record.quote.route.kind === "relay" ? record.quote.route.relay : undefined;
 
             return (
-            <article className="historyRow" key={record.id}>
-              <div>
-                <strong>
-                  {record.intent.sourceAmount} {record.intent.sourceAsset.symbol}
-                </strong>
-                <span>
-                  To {record.beneficiaryName ?? shortAddress(record.intent.destination)}
-                </span>
-                {record.intent.memo ? <span>{record.intent.memo}</span> : null}
-              </div>
-              <div className="historyMeta">
-                <span>Settled</span>
-                <span>{new Date(record.settledAt).toLocaleString()}</span>
-                <details className="historyTechnicalDetails">
-                  <summary>Technical details</summary>
-                  <div className="historyTechnicalBody">
-                    <span>Network: {chain.name}</span>
-                    {record.verification ? <span>Settlement: Verified on-chain</span> : null}
-                    <span>Transaction: {shortAddress(record.txHash)}</span>
-                    <a
-                      className="inlineLink inlineLinkNoMargin"
-                      href={getTransactionExplorerUrl(network, record.txHash)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View on blockchain
-                    </a>
-                  </div>
-                </details>
-              </div>
-            </article>
+              <article className="historyRow" key={record.id}>
+                <div>
+                  <strong>
+                    {record.intent.destinationAmount ?? record.intent.sourceAmount} {record.intent.destinationAsset.symbol}
+                  </strong>
+                  <span>To {record.beneficiaryName ?? shortAddress(record.intent.destination)}</span>
+                  {relay ? <span>Celo → Base</span> : null}
+                  {record.intent.memo ? <span>{record.intent.memo}</span> : null}
+                </div>
+                <div className="historyMeta">
+                  <span>Settled</span>
+                  <span>{new Date(record.settledAt).toLocaleString()}</span>
+                  <details className="historyTechnicalDetails">
+                    <summary>Technical details</summary>
+                    <div className="historyTechnicalBody">
+                      <span>Origin: {chain.name}</span>
+                      {relay ? <span>Destination: Base</span> : null}
+                      {record.verification ? (
+                        <span>Settlement: {relay ? "Verified through Relay + origin chain" : "Verified on-chain"}</span>
+                      ) : null}
+                      <span>Origin transaction: {shortAddress(record.txHash)}</span>
+                      <a
+                        className="inlineLink inlineLinkNoMargin"
+                        href={getTransactionExplorerUrl(sourceNetwork === "celo" ? "celo" : "celo-sepolia", record.txHash)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        View origin transaction
+                      </a>
+                      {relay?.destinationTxHash ? (
+                        <a
+                          className="inlineLink inlineLinkNoMargin"
+                          href={`https://basescan.org/tx/${relay.destinationTxHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View destination transaction
+                        </a>
+                      ) : null}
+                    </div>
+                  </details>
+                </div>
+              </article>
             );
           })}
         </div>

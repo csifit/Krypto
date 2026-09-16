@@ -42,6 +42,7 @@ export type FiatProviderFee = {
 export type FiatQuoteRequest = {
   direction: FiatRouteDirection;
   countryCode: string;
+  subdivisionCode?: string;
   sourceAsset: PaymentAsset;
   destinationAsset: PaymentAsset;
   amount: string;
@@ -49,6 +50,7 @@ export type FiatQuoteRequest = {
   sourceWallet?: `0x${string}`;
   destinationWallet?: `0x${string}`;
   paymentMethodId?: string;
+  clientIp?: string;
 };
 
 export type FiatQuote = {
@@ -111,6 +113,7 @@ export type FiatCurrencySupport = {
 export type FiatProviderContext = {
   direction: FiatRouteDirection;
   countryCode: string;
+  subdivisionCode?: string;
 };
 
 export type FiatProviderCurrencyContext =

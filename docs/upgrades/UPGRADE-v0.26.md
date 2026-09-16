@@ -1,103 +1,58 @@
-# v0.26A — Fiat Routing Foundation
+# v0.26B — First real fiat provider adapter
 
-## Purpose
+## Provider
 
-Create the stable production contract that future fiat providers plug into before integrating any particular provider.
+Coinbase CDP Onramp/Offramp is the first implementation of `FiatProvider`.
 
-Krypto121 remains the router.
+This does not make Coinbase the Krypto121 architecture. It is provider #1 behind the existing abstraction.
 
-Coinbase, Kraken and future services are interchangeable rails.
-
-## Domain model
-
-### Directions
+Future provider structure remains:
 
 ```text
-fiat-to-crypto
-crypto-to-fiat
+FiatProvider
+├─ CoinbaseFiatProvider
+├─ KrakenFiatProvider
+└─ future providers
 ```
 
-### Quote request
+## Why Coinbase is implemented before Kraken
 
-A normalized quote request contains:
+Coinbase currently exposes public production documentation for both hosted onramp and offramp, including discovery, quotes, session tokens and transaction status.
 
-- direction
-- country
-- source asset
-- destination asset
-- amount
-- amount side (`source` or `destination`)
-- source wallet where required
-- destination wallet where required
-- optional payment-method identifier
+Kraken's commercial Ramp product advertises buy and sell, but its currently public Ramp API material is still more complete for onramp. Kraken should be added once its sell/offramp production API contract is available to Krypto121.
 
-### Normalized quote
+## Dependencies
 
-Every provider returns:
-
-- provider identity
-- provider quote ID
-- source amount
-- destination amount
-- normalized fee lines
-- optional exchange rate
-- optional estimated duration
-- expiry
-- availability
-
-Provider-specific raw responses are deliberately not part of the shared domain contract.
-
-## Provider interface
-
-```ts
-interface FiatProvider {
-  getSupportedCountries()
-  getSupportedCurrencies()
-  getSupportedAssets()
-  getSupportedPaymentMethods()
-  getQuote()
-  createSession()
-  getStatus()
-}
-```
-
-## Router behavior
-
-The router asks all configured providers for a quote.
-
-Failures are isolated by provider and normalized into:
+Adds:
 
 ```text
-unsupported
-unavailable
-invalid-request
-authentication
-rate-limited
-provider-error
+@coinbase/cdp-sdk 1.55.0
 ```
 
-Selection follows Krypto121's standing rule:
+This is used only for Coinbase request-bound JWT authentication.
+
+## Environment
+
+Server-only:
 
 ```text
-Use the lowest-cost valid route.
+COINBASE_CDP_API_KEY_ID
+COINBASE_CDP_API_KEY_SECRET
 ```
 
-For exact-source requests, the best quote is the one delivering the most destination value.
+Without both values, Coinbase is not registered.
 
-For exact-destination requests, the best quote is the one requiring the least source value.
+## No UI yet
 
-Only matching, available, non-expired quotes can win.
+Do not expose Fiat / Cash out in Send until all of the following are ready:
 
-## Why this is directly reusable
+1. provider session persistence
+2. trusted client-IP resolution
+3. redirect/recovery flow
+4. offramp onchain send execution
+5. settlement/reconciliation
+6. end-to-end sandbox or trial-mode validation
 
-Coinbase exposes buy/sell quoting and hosted/session-based on/off-ramp flows.
+## No migration
 
-Kraken Ramp exposes capability discovery, quoting and hosted checkout concepts, while its broader Ramp offering advertises buy/sell.
-
-The provider adapters can therefore normalize their different APIs into this contract without changing Krypto121 payment UX.
-
-## No database changes
-
-There is no migration in v0.26A.
-
-Persistence should be added only when we create real provider sessions and need durable status/recovery.
+v0.26B has no Supabase migration.

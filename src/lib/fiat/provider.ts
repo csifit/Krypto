@@ -33,6 +33,7 @@ export class FiatProviderError extends Error {
 
 export type CreateFiatSessionInput = {
   quote: FiatQuote;
+  request: FiatQuoteRequest;
   partnerUserId: string;
   redirectUrl?: string;
 };

@@ -1,121 +1,219 @@
-# Krypto121 v0.26A — Fiat Routing Foundation
+# Krypto121 v0.26B — Coinbase Fiat Provider
 
-This is a provider-neutral foundation only.
+This is the first real provider adapter behind the provider-neutral v0.26 fiat-routing foundation.
 
-It does not expose fiat payments in the UI yet and it does not contain a Coinbase or Kraken implementation.
+It does **not** add fiat controls to the user interface yet.
+
+## Why Coinbase first
+
+Coinbase currently exposes a complete public developer path for both:
+
+```text
+fiat → crypto
+crypto → fiat
+```
+
+including:
+
+- country/payment-method discovery
+- fiat/crypto option discovery
+- buy quotes
+- sell quotes
+- secure session tokens
+- hosted onramp/offramp flows
+- transaction status
+
+Kraken remains a future provider behind the same `FiatProvider` contract.
 
 ## Added
 
 ```text
+src/lib/fiat/providers/coinbase.ts
+src/lib/server/fiatProviders.ts
+```
+
+## Refined generic contract
+
+```text
 src/lib/fiat/types.ts
 src/lib/fiat/provider.ts
-src/lib/fiat/router.ts
-src/lib/fiat/index.ts
 ```
 
-## FiatProvider contract
+The refinements add:
 
-Every future fiat rail implements the same interface:
+- optional ISO subdivision/state
+- optional trusted end-user client IP
+- original quote request passed into `createSession()`
+
+These are provider-neutral requirements needed by regulated fiat rails.
+
+## Coinbase authentication
+
+The adapter uses Coinbase's official JWT helper from:
 
 ```text
-getSupportedCountries()
-getSupportedCurrencies()
-getSupportedAssets()
-getSupportedPaymentMethods()
-getQuote()
-createSession()
-getStatus()
+@coinbase/cdp-sdk
 ```
 
-This lets Krypto121 integrate Coinbase, Kraken and future providers without making any provider the product architecture.
-
-## Both directions
-
-The domain model supports:
+Pinned version:
 
 ```text
-fiat-to-crypto
-crypto-to-fiat
+1.55.0
 ```
+
+The new 1.56.0 release was intentionally not adopted immediately.
+
+Server-only environment variables:
+
+```text
+COINBASE_CDP_API_KEY_ID=
+COINBASE_CDP_API_KEY_SECRET=
+```
+
+Do **not** prefix either with `NEXT_PUBLIC_`.
+
+No Coinbase Wallet Secret is required for this adapter because Krypto121 is not asking Coinbase to sign wallet transactions.
+
+If these environment variables are absent, Coinbase is simply not registered as an available fiat provider.
+
+## Provider registration
+
+Use:
+
+```ts
+getConfiguredFiatProviders()
+```
+
+from:
+
+```text
+src/lib/server/fiatProviders.ts
+```
+
+Only configured providers are returned.
+
+## Supported behavior
+
+### Discovery
+
+Coinbase live APIs determine:
+
+- supported countries
+- supported fiat currencies
+- supported crypto assets and networks
+- supported payment methods
+
+Krypto121 does not hard-code Coinbase country coverage.
+
+Config/options responses are cached in-process for five minutes.
+
+### Network matching
+
+Krypto121 matches Coinbase networks using chain IDs rather than assuming a network name.
+
+Current Krypto121 chain IDs:
+
+```text
+Celo Sepolia  11142220
+Celo          42220
+Base          8453
+```
+
+If Coinbase exposes a matching asset/network in its live Options API, the adapter can use it. Otherwise the route is marked unsupported.
+
+### Quotes
+
+The adapter currently accepts exact-source requests because Coinbase's v1 hosted buy/sell quote endpoints are source-amount based.
 
 Examples:
 
 ```text
-EUR → USDC
-USDC → EUR
-USD → USDT
-USDT → USD
+100 EUR → how much USDC?
+50 USDC → how much EUR?
 ```
 
-A fiat-to-crypto quote requires a destination wallet.
+Exact-destination provider quoting remains unsupported by this Coinbase adapter for now rather than being approximated.
 
-A crypto-to-fiat quote requires a source wallet.
+Coinbase documents its hosted quotes as estimates. Coinbase does not expose a quote-expiry timestamp in these v1 quote responses, so Krypto121 applies a short 60-second local quote freshness window before route selection/review.
 
-## Quote routing
+### Sessions
 
-`collectFiatQuotes()` requests quotes from all configured providers independently.
+Krypto121 creates a Coinbase session token server-side and builds the Coinbase-hosted URL with:
 
-One provider failing does not prevent another provider from returning a valid quote.
+- single-use session token
+- Krypto121 partner reference
+- provider quote ID
+- wallet/network/asset restriction
+- redirect URL where applicable
 
-`selectBestFiatQuote()` then selects among valid, non-expired quotes.
+Coinbase session tokens expire after five minutes.
 
-For an exact source amount:
+### Status
+
+The returned `providerSessionId` contains only:
 
 ```text
-I will spend 500 EUR
+buy:<partnerUserRef>
 ```
 
-Krypto121 chooses the quote with the highest destination amount.
-
-For an exact destination amount:
+or:
 
 ```text
-Recipient should receive 500 EUR
+sell:<partnerUserRef>
 ```
 
-Krypto121 chooses the quote requiring the lowest source amount.
+Krypto121 can poll Coinbase transaction status through `getStatus()` and normalize the result into:
 
-If outcomes are equal, the shorter estimated duration wins. A provider ID tie-break makes the result deterministic.
+```text
+awaiting-user
+processing
+completed
+failed
+cancelled
+expired
+```
 
-The comparison uses decimal-string comparison instead of JavaScript floating-point arithmetic.
+## Security boundary
 
-## Provider responsibility
+Krypto121 never stores or sends:
 
-A provider adapter remains responsible for mapping its own:
+- user private keys
+- seed phrases
+- bank credentials
+- Coinbase customer passwords
 
-- countries
-- currencies
-- assets/networks
-- payment methods
-- quote identifiers
-- hosted/session flow
-- transaction status
+Coinbase handles its own hosted onboarding/KYC/payment-method workflow.
 
-into Krypto121's normalized domain model.
+The Coinbase CDP API key remains server-only.
+
+## Client IP
+
+Coinbase requires the end-user client IP when creating a session token and warns integrations not to trust spoofable forwarding headers blindly.
+
+This adapter therefore expects `clientIp` to be explicitly supplied by a trusted server layer. It does not guess one itself.
 
 ## Not included yet
 
-- Coinbase adapter
-- Kraken adapter
-- API credentials
-- provider-specific environment variables
-- database migration
 - fiat UI
-- bank details
-- KYC data storage
+- Coinbase credentials
+- Kraken adapter
+- provider database persistence
 - webhooks
+- onchain offramp execution
+- automatic Celo → Base → Coinbase route composition
 
-There are no fake provider routes.
+These remain separate steps so no fake or incomplete user-facing fiat path is exposed.
+
+## Database
+
+No migration is required.
 
 ## Build
 
-This package is an overlay for the existing v0.25 source.
-
-After replacing/adding the files:
+Apply this overlay on top of current v0.26 and run:
 
 ```powershell
 Remove-Item -Recurse -Force .next
+npm install
 npm run build
 ```
-
-No Supabase migration is required for this foundation step.

@@ -1,6 +1,6 @@
 {
   "name": "krypto121",
-  "version": "0.26.0",
+  "version": "0.26.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,6 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@coinbase/cdp-sdk": "1.55.0",
     "@privy-io/node": "0.34.0",
     "@privy-io/react-auth": "3.42.0",
     "@supabase/supabase-js": "2.109.0",

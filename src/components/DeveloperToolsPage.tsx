@@ -7,6 +7,7 @@ import BusinessApiPanel from "@/components/BusinessApiPanel";
 import DashboardSidebar, {
   type SecondarySection,
 } from "@/components/DashboardSidebar";
+import ProviderConnectionsPanel from "@/components/ProviderConnectionsPanel";
 import TestFundsPanel from "@/components/TestFundsPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useWalletPortfolio } from "@/hooks/useWalletPortfolio";
@@ -60,15 +61,11 @@ export default function DeveloperToolsPage() {
   }, [embeddedWallet]);
 
   const portfolio = useWalletPortfolio(
-    walletProvider
-      ? [walletProvider.address]
-      : [],
+    walletProvider ? [walletProvider.address] : [],
   );
 
   const embeddedBalance = walletProvider
-    ? portfolio.balances[
-        walletProvider.address.toLowerCase()
-      ]
+    ? portfolio.balances[walletProvider.address.toLowerCase()]
     : undefined;
 
   useEffect(() => {
@@ -124,6 +121,11 @@ export default function DeveloperToolsPage() {
       return;
     }
 
+    if (section === "fiat") {
+      router.push("/fiat");
+      return;
+    }
+
     if (section === "beneficiaries") {
       router.push("/beneficiaries");
       return;
@@ -159,8 +161,7 @@ export default function DeveloperToolsPage() {
           <p className="eyebrow">Developer tools</p>
           <h1>Build with Krypto121.</h1>
           <p className="landingLead">
-            Sign in to manage your Business API and
-            technical payment settings.
+            Sign in to manage integrations and technical payment settings.
           </p>
 
           <button
@@ -183,9 +184,7 @@ export default function DeveloperToolsPage() {
         onClose={() => setMenuOpen(false)}
         onSelect={handleSidebar}
         onLogout={logout}
-        isSuperAdmin={
-          accountProfile?.role === "super_admin"
-        }
+        isSuperAdmin={accountProfile?.role === "super_admin"}
       />
 
       <main className="dashboardMain">
@@ -208,13 +207,9 @@ export default function DeveloperToolsPage() {
           <header className="walletPageHeader">
             <div>
               <p className="eyebrow">Integrations</p>
-              <h1 className="dashboardTitle">
-                Developer tools
-              </h1>
+              <h1 className="dashboardTitle">Developer tools</h1>
               <p className="walletPageLead">
-                API access and technical information for
-                integrating Krypto121 into your business
-                systems.
+                API access, provider connections and technical payment information.
               </p>
             </div>
           </header>
@@ -231,9 +226,7 @@ export default function DeveloperToolsPage() {
               className="accountRestrictionNotice"
               role="status"
             >
-              <strong>
-                Developer actions are unavailable
-              </strong>
+              <strong>Developer actions are unavailable</strong>
               <span>
                 {accountProfile.statusReason ??
                   "This Krypto121 account is currently restricted."}
@@ -242,16 +235,14 @@ export default function DeveloperToolsPage() {
           ) : null}
 
           {loading ? (
-            <p className="hint">
-              Loading Developer tools…
-            </p>
+            <p className="hint">Loading Developer tools…</p>
           ) : (
             <>
+              <ProviderConnectionsPanel />
+
               <section className="businessPanel">
                 <BusinessApiPanel
-                  businessProfileReady={Boolean(
-                    businessProfile,
-                  )}
+                  businessProfileReady={Boolean(businessProfile)}
                   readOnly={
                     !accountProfile ||
                     accountProfile.accountStatus !== "active"
@@ -260,21 +251,16 @@ export default function DeveloperToolsPage() {
               </section>
 
               <section className="businessPanel">
-                <p className="eyebrow">
-                  Technical environment
-                </p>
+                <p className="eyebrow">Technical environment</p>
                 <h2>Payment infrastructure</h2>
                 <p className="muted">
-                  Technical details for development and
-                  integration work.
+                  Technical details for development and integration work.
                 </p>
 
                 <div className="developerFacts">
                   <div>
                     <span>Network</span>
-                    <strong>
-                      {ACTIVE_CELO_CHAIN.name}
-                    </strong>
+                    <strong>{ACTIVE_CELO_CHAIN.name}</strong>
                   </div>
 
                   <div>
@@ -288,9 +274,7 @@ export default function DeveloperToolsPage() {
 
                   <div>
                     <span>Wallet provider</span>
-                    <strong>
-                      Privy · replaceable
-                    </strong>
+                    <strong>Privy · replaceable</strong>
                   </div>
 
                   <div>
@@ -320,9 +304,7 @@ export default function DeveloperToolsPage() {
               {!IS_MAINNET && walletProvider ? (
                 <TestFundsPanel
                   wallet={walletProvider}
-                  celoBalance={
-                    embeddedBalance?.celo ?? "0"
-                  }
+                  celoBalance={embeddedBalance?.celo ?? "0"}
                   onFunded={portfolio.refresh}
                 />
               ) : null}

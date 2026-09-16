@@ -5,6 +5,7 @@ import { ACTIVE_ENVIRONMENT_LABEL } from "@/lib/celo";
 
 export type SecondarySection =
   | "wallets"
+  | "fiat"
   | "beneficiaries"
   | "business"
   | "requests"
@@ -80,6 +81,18 @@ export default function DashboardSidebar({
             >
               My wallets
             </button>
+
+            <a
+              className={
+                activeSection === "fiat"
+                  ? "sidebarNavItem sidebarNavLink sidebarNavItemActive"
+                  : "sidebarNavItem sidebarNavLink"
+              }
+              href="/fiat"
+              onClick={onClose}
+            >
+              Buy / Cash out
+            </a>
 
             <button
               className={

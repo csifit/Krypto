@@ -1,0 +1,10 @@
+.amountCurrency {
+  width: auto !important;
+  min-width: 74px;
+  min-height: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  font-weight: 700;
+  outline: none;
+}
